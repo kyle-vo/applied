@@ -8,16 +8,18 @@ function showMsg(text, type) {
   if (type === "success") setTimeout(() => (el.style.display = "none"), 3000);
 }
 
-async function getSettings() {
+const API_URL = "https://backend-production-ab8c.up.railway.app/api";
+
+async function getToken() {
   return new Promise((resolve) =>
-    chrome.storage.sync.get(["apiUrl", "token"], resolve)
+    chrome.storage.sync.get(["token"], ({ token }) => resolve(token))
   );
 }
 
 async function init() {
-  const { apiUrl, token } = await getSettings();
+  const token = await getToken();
 
-  if (!token || !apiUrl) {
+  if (!token) {
     $("noToken").style.display = "block";
     return;
   }
@@ -52,7 +54,7 @@ $("submitBtn").addEventListener("click", async () => {
     return;
   }
 
-  const { apiUrl, token } = await getSettings();
+  const token = await getToken();
   const btn = $("submitBtn");
   btn.disabled = true;
   btn.textContent = "Adding…";
@@ -62,7 +64,7 @@ $("submitBtn").addEventListener("click", async () => {
     const jobUrl = tabs[0]?.url || "";
 
     try {
-      const res = await fetch(`${apiUrl}/applications`, {
+      const res = await fetch(`${API_URL}/applications`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

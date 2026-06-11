@@ -1,21 +1,21 @@
 const $ = (id) => document.getElementById(id);
 
-// Load saved settings
-chrome.storage.sync.get(["apiUrl", "token"], ({ apiUrl, token }) => {
-  if (apiUrl) $("apiUrl").value = apiUrl;
+const API_URL = "https://backend-production-ab8c.up.railway.app/api";
+
+// Load saved token
+chrome.storage.sync.get(["token"], ({ token }) => {
   if (token) $("token").value = token;
 });
 
 $("saveBtn").addEventListener("click", () => {
-  const apiUrl = $("apiUrl").value.trim().replace(/\/$/, "");
   const token = $("token").value.trim();
 
-  if (!apiUrl || !token) {
-    showMsg("Both fields are required.", "error");
+  if (!token) {
+    showMsg("Token is required.", "error");
     return;
   }
 
-  chrome.storage.sync.set({ apiUrl, token }, () => {
+  chrome.storage.sync.set({ token }, () => {
     showMsg("Settings saved!", "success");
   });
 });

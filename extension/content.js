@@ -90,43 +90,51 @@ function scrapeAshby() {
 }
 
 function scrapeSimplify() {
-  const role =
-    document.querySelector("h1")?.innerText?.trim() ||
-    document.querySelector("[class*='job-title']")?.innerText?.trim();
+  const role = document.querySelector("h1")?.innerText?.trim();
 
-  const company =
-    document.querySelector("[class*='company-name']")?.innerText?.trim() ||
-    document.querySelector("[class*='employer']")?.innerText?.trim() ||
-    document.querySelector("h2")?.innerText?.trim();
+  // h2 is reliably the company name on Simplify job pages
+  const company = document.querySelector("h2")?.innerText?.trim();
 
   const description =
-    document.querySelector("[class*='job-description']")?.innerText?.trim() ||
-    document.querySelector("[class*='description']")?.innerText?.trim() ||
-    document.querySelector("main")?.innerText?.trim();
+    document.querySelector("article")?.innerText?.trim() ||
+    document.querySelector("[id*='description']")?.innerText?.trim() ||
+    document.querySelector("main section")?.innerText?.trim();
 
   return { role, company, description };
 }
 
-function scrapeHandshake() {
-  const role =
-    document.querySelector("h1[class*='job']")?.innerText?.trim() ||
-    document.querySelector("[data-hook='job-name']")?.innerText?.trim() ||
-    document.querySelector("h1")?.innerText?.trim();
+async function scrapeHandshake() {
+  const role = document.querySelector("h1")?.innerText?.trim();
 
+  // Title format: "Role | Company | Handshake"
+  const titleParts = document.title.split(" | ");
   const company =
-    document.querySelector("[data-hook='employer-name']")?.innerText?.trim() ||
-    document.querySelector("[class*='employer-name']")?.innerText?.trim() ||
-    document.querySelector("[class*='company']")?.innerText?.trim();
+    (titleParts.length >= 2 ? titleParts[1].trim() : "") ||
+    document.querySelector("[data-hook='job-details-page']")?.innerText?.split("\n")[0]?.trim();
 
-  const description =
-    document.querySelector("[data-hook='job-description']")?.innerText?.trim() ||
-    document.querySelector("[class*='job-description']")?.innerText?.trim() ||
-    document.querySelector("[class*='description']")?.innerText?.trim();
+  // Click "More" to expand the truncated description
+  const moreBtn = Array.from(document.querySelectorAll("button"))
+    .find(b => b.innerText?.trim().startsWith("More"));
+  if (moreBtn) {
+    moreBtn.click();
+    await new Promise((r) => setTimeout(r, 600));
+  }
+
+  // Slice just the "Job description" section out of the full page text
+  const allText = document.querySelector("[data-hook='job-details-page']")?.innerText || "";
+  const start = allText.indexOf("Job description");
+  const end = allText.indexOf("About the employer");
+  let description = "";
+  if (start !== -1) {
+    description = allText
+      .slice(start + "Job description".length, end !== -1 ? end : undefined)
+      .trim();
+  }
 
   return { role, company, description };
 }
 
-function scrape() {
+async function scrape() {
   const url = window.location.href;
   let data = { role: "", company: "", description: "", url };
 
@@ -145,7 +153,7 @@ function scrape() {
   } else if (url.includes("simplify.jobs")) {
     Object.assign(data, scrapeSimplify());
   } else if (url.includes("joinhandshake.com")) {
-    Object.assign(data, scrapeHandshake());
+    Object.assign(data, await scrapeHandshake());
   }
 
   return data;
@@ -153,7 +161,7 @@ function scrape() {
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "SCRAPE_JOB") {
-    sendResponse(scrape());
+    scrape().then(sendResponse);
   }
   return true;
 });
