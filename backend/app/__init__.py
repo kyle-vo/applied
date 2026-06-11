@@ -28,11 +28,7 @@ def create_app():
     # Extensions
     db.init_app(app)
     migrate.init_app(app, db)
-    allowed_origins = [
-        os.environ.get("FRONTEND_URL", "http://localhost:3000"),
-        "chrome-extension://*",
-    ]
-    CORS(app, resources={r"/api/*": {"origins": allowed_origins}})
+    CORS(app, resources={r"/api/*": {"origins": "*"}})
 
     # Redis
     global redis_client
