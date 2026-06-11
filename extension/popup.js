@@ -8,7 +8,7 @@ function showMsg(text, type) {
   if (type === "success") setTimeout(() => (el.style.display = "none"), 3000);
 }
 
-const API_URL = "https://backend-production-ab8c.up.railway.app/api";
+const API_URL = "https://backend-production-e4a61.up.railway.app/api";
 
 async function getToken() {
   return new Promise((resolve) =>
@@ -32,6 +32,7 @@ async function init() {
       if (chrome.runtime.lastError || !data) return;
       if (data.company) $("company").value = data.company;
       if (data.role) $("role").value = data.role;
+      if (data.location) $("location").value = data.location;
       if (data.description) $("description").value = data.description;
     });
   });
@@ -82,6 +83,7 @@ $("submitBtn").addEventListener("click", async () => {
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
+        if (res.status === 401) throw new Error("Token expired — go to Settings → Copy Token and update the extension.");
         throw new Error(err.error || `Error ${res.status}`);
       }
 

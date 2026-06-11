@@ -124,8 +124,19 @@ npm run dev                 # runs on :3000, proxies /api to :5000
 - [x] Follow-up date tracking
 
 ## Kyle's goals for this project
-1. **Deploy to Railway** — get the full stack (Flask + Postgres + Redis + frontend) live on Railway
-2. **Resume project** — once live, this goes on Kyle's resume as a shipped full-stack AI app
+1. **Deploy to Railway** — ✅ done, live at https://frontend-production-ab8c.up.railway.app (backend: https://backend-production-e4a61.up.railway.app)
+2. **Resume project** — ✅ Applied is on Kyle's resume as a shipped full-stack AI app with Chrome extension
+
+## Next session: Long-lived API key for browser extension
+The Chrome extension currently uses Clerk JWTs copied from the Settings page, which expire every ~15 minutes. Fix: add a long-lived API key system so the extension never needs a token refresh.
+
+**What to build:**
+1. `backend/app/models/api_key.py` — `api_keys` table: `id`, `user_id`, `key_hash` (SHA-256), `prefix` (first 8 chars for display), `created_at`
+2. `backend/app/routes/keys.py` — `POST /api/keys` (generate), `DELETE /api/keys/:id` (revoke), `GET /api/keys` (list)
+3. `backend/app/middleware/auth.py` — update `@require_auth` to accept either Clerk JWT **or** `X-API-Key: <key>` header
+4. `backend/migrations/` — new migration for `api_keys` table
+5. `frontend/src/Settings.jsx` — "Extension Token" section: Generate button shows the key once (copy it), lists existing keys with revoke button
+6. `extension/popup.js` + `extension/settings.js` — switch from Clerk JWT to API key (stored in `chrome.storage.sync` as `apiKey`)
 
 ## What's next (Phase 2 — AI scoring)
 The `job_description` field is already stored. The plan:

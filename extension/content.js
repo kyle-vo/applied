@@ -91,16 +91,29 @@ function scrapeAshby() {
 
 function scrapeSimplify() {
   const role = document.querySelector("h1")?.innerText?.trim();
-
-  // h2 is reliably the company name on Simplify job pages
   const company = document.querySelector("h2")?.innerText?.trim();
 
-  const description =
-    document.querySelector("article")?.innerText?.trim() ||
-    document.querySelector("[id*='description']")?.innerText?.trim() ||
-    document.querySelector("main section")?.innerText?.trim();
+  let description = "";
+  let location = "";
 
-  return { role, company, description };
+  // Simplify is Next.js — all job data is embedded in __NEXT_DATA__
+  try {
+    const raw = document.getElementById("__NEXT_DATA__")?.textContent;
+    const nextData = JSON.parse(raw || "{}");
+    const posting = nextData?.props?.pageProps?.jobPosting;
+    if (posting) {
+      // Strip HTML tags from description
+      const tmp = document.createElement("div");
+      tmp.innerHTML = posting.description || "";
+      description = tmp.innerText?.trim();
+
+      // Location: "Lake Forest, CA, USA" → "Lake Forest, CA"
+      const loc = posting.locations?.[0]?.value || "";
+      location = loc.replace(/,\s*(USA|United States)$/, "").trim();
+    }
+  } catch (e) {}
+
+  return { role, company, location, description };
 }
 
 async function scrapeHandshake() {
@@ -131,7 +144,11 @@ async function scrapeHandshake() {
       .trim();
   }
 
-  return { role, company, description };
+  // Location pattern: "Remote", "Hybrid", or "Onsite, based in City, ST"
+  const locationMatch = allText.match(/(Remote|Hybrid|Onsite,\s*based in\s*[^\n]+)/);
+  const location = locationMatch ? locationMatch[1].trim() : "";
+
+  return { role, company, location, description };
 }
 
 async function scrape() {
