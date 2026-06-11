@@ -14,4 +14,4 @@ COPY . .
 ENV FLASK_APP=wsgi.py
 EXPOSE 5000
 
-CMD ["sh", "-c", "gunicorn wsgi:app --bind 0.0.0.0:${PORT:-5000} --workers 2 --timeout 60"]
+CMD ["sh", "-c", "flask db upgrade && gunicorn wsgi:app --bind 0.0.0.0:${PORT:-5000} --workers 2 --timeout 60"]
