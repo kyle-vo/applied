@@ -4,6 +4,9 @@
   "version": "1.0.0",
   "description": "Add job postings to Applied with one click",
   "permissions": ["activeTab", "storage"],
+  "host_permissions": [
+    "https://backend-production-ab8c.up.railway.app/*"
+  ],
   "action": {
     "default_popup": "popup.html",
     "default_title": "Add to Applied"
