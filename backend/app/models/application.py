@@ -59,8 +59,8 @@ class Application(db.Model):
             "status": self.status.value,
             "ai_match_score": self.ai_match_score,
             "ai_analysis": self.ai_analysis,
-            "applied_at": self.applied_at.isoformat() if self.applied_at else None,
-            "follow_up_at": self.follow_up_at.isoformat() if self.follow_up_at else None,
-            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "applied_at": self.applied_at.isoformat() + "Z" if self.applied_at else None,
+            "follow_up_at": self.follow_up_at.isoformat() + "Z" if self.follow_up_at else None,
+            "updated_at": self.updated_at.isoformat() + "Z" if self.updated_at else None,
             "notes": self.notes,
         }
