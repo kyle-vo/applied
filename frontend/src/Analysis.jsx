@@ -20,11 +20,11 @@ export default function Analysis() {
   );
   const noJd = applications.filter((a) => !a.job_description);
 
-  async function handleAnalyze(id) {
+  async function handleAnalyze(id, force = false) {
     setErrors((prev) => { const e = { ...prev }; delete e[id]; return e; });
     setAnalyzing((prev) => new Set([...prev, id]));
     try {
-      await analyzeApplication(id);
+      await analyzeApplication(id, { force });
     } catch (err) {
       setErrors((prev) => ({ ...prev, [id]: err.message }));
     } finally {
@@ -112,7 +112,7 @@ export default function Analysis() {
                     <div className="flex items-center gap-3">
                       <ScoreRing score={app.ai_match_score} />
                       <button
-                        onClick={() => handleAnalyze(app.id)}
+                        onClick={() => handleAnalyze(app.id, true)}
                         disabled={analyzing.has(app.id)}
                         className="text-xs text-gray-400 hover:text-gray-600 underline disabled:opacity-50"
                       >

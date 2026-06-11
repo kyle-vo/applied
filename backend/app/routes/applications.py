@@ -168,10 +168,12 @@ def analyze_application(app_id):
         return jsonify({"error": "No job description — add one before analyzing"}), 400
 
     cache_key = f"analysis:{app_id}"
+    force = request.args.get("force") == "true"
     try:
-        cached = redis_client.get(cache_key)
-        if cached:
-            return jsonify(json.loads(cached))
+        if not force:
+            cached = redis_client.get(cache_key)
+            if cached:
+                return jsonify(json.loads(cached))
     except Exception:
         pass
 

@@ -47,8 +47,9 @@ export function useApplications() {
     return updateApplication(id, { status });
   }
 
-  async function analyzeApplication(id) {
-    const updated = await api.post(`/applications/${id}/analyze`, {});
+  async function analyzeApplication(id, { force = false } = {}) {
+    const url = `/applications/${id}/analyze${force ? "?force=true" : ""}`;
+    const updated = await api.post(url, {});
     setApplications((prev) => prev.map((a) => (a.id === id ? updated : a)));
     return updated;
   }
