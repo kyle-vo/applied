@@ -4,6 +4,7 @@ import Navbar from "./Navbar";
 import Dashboard from "./Dashboard";
 import Applications from "./Applications";
 import Analysis from "./Analysis";
+import Settings from "./Settings";
 
 function ProtectedLayout({ children }) {
   return (
@@ -38,6 +39,10 @@ export default function App() {
       <Route
         path="/analysis"
         element={<ProtectedLayout><Analysis /></ProtectedLayout>}
+      />
+      <Route
+        path="/settings"
+        element={<ProtectedLayout><Settings /></ProtectedLayout>}
       />
       <Route
         path="/debug"

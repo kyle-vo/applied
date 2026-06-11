@@ -175,9 +175,14 @@ def analyze_application(app_id):
     except Exception:
         pass
 
+    from app.models.user_profile import UserProfile
+    profile = UserProfile.query.filter_by(user_id=g.user_id).first()
+    if not profile or not profile.resume_text:
+        return jsonify({"error": "No resume found — upload your resume in Settings first"}), 400
+
     from app.services.ai import analyze_match
     try:
-        result = analyze_match(app_entry.job_description)
+        result = analyze_match(app_entry.job_description, profile.resume_text)
     except Exception as e:
         return jsonify({"error": f"AI analysis failed: {str(e)}"}), 502
 
