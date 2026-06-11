@@ -108,15 +108,20 @@ export default function Analysis() {
                     <p className="font-medium text-gray-900">{app.company}</p>
                     <p className="text-sm text-gray-500">{app.role}</p>
                   </div>
-                  <div className="flex items-center gap-3 shrink-0">
-                    <ScoreRing score={app.ai_match_score} />
-                    <button
-                      onClick={() => handleAnalyze(app.id)}
-                      disabled={analyzing.has(app.id)}
-                      className="text-xs text-gray-400 hover:text-gray-600 underline disabled:opacity-50"
-                    >
-                      {analyzing.has(app.id) ? "Re-analyzing…" : "Re-analyze"}
-                    </button>
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    <div className="flex items-center gap-3">
+                      <ScoreRing score={app.ai_match_score} />
+                      <button
+                        onClick={() => handleAnalyze(app.id)}
+                        disabled={analyzing.has(app.id)}
+                        className="text-xs text-gray-400 hover:text-gray-600 underline disabled:opacity-50"
+                      >
+                        {analyzing.has(app.id) ? "Re-analyzing…" : "Re-analyze"}
+                      </button>
+                    </div>
+                    {errors[app.id] && (
+                      <p className="text-xs text-red-500">{errors[app.id]}</p>
+                    )}
                   </div>
                 </div>
 
