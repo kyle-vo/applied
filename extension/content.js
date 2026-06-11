@@ -89,6 +89,43 @@ function scrapeAshby() {
   return { role, company, description };
 }
 
+function scrapeSimplify() {
+  const role =
+    document.querySelector("h1")?.innerText?.trim() ||
+    document.querySelector("[class*='job-title']")?.innerText?.trim();
+
+  const company =
+    document.querySelector("[class*='company-name']")?.innerText?.trim() ||
+    document.querySelector("[class*='employer']")?.innerText?.trim() ||
+    document.querySelector("h2")?.innerText?.trim();
+
+  const description =
+    document.querySelector("[class*='job-description']")?.innerText?.trim() ||
+    document.querySelector("[class*='description']")?.innerText?.trim() ||
+    document.querySelector("main")?.innerText?.trim();
+
+  return { role, company, description };
+}
+
+function scrapeHandshake() {
+  const role =
+    document.querySelector("h1[class*='job']")?.innerText?.trim() ||
+    document.querySelector("[data-hook='job-name']")?.innerText?.trim() ||
+    document.querySelector("h1")?.innerText?.trim();
+
+  const company =
+    document.querySelector("[data-hook='employer-name']")?.innerText?.trim() ||
+    document.querySelector("[class*='employer-name']")?.innerText?.trim() ||
+    document.querySelector("[class*='company']")?.innerText?.trim();
+
+  const description =
+    document.querySelector("[data-hook='job-description']")?.innerText?.trim() ||
+    document.querySelector("[class*='job-description']")?.innerText?.trim() ||
+    document.querySelector("[class*='description']")?.innerText?.trim();
+
+  return { role, company, description };
+}
+
 function scrape() {
   const url = window.location.href;
   let data = { role: "", company: "", description: "", url };
@@ -105,6 +142,10 @@ function scrape() {
     Object.assign(data, scrapeWorkday());
   } else if (url.includes("ashbyhq.com")) {
     Object.assign(data, scrapeAshby());
+  } else if (url.includes("simplify.jobs")) {
+    Object.assign(data, scrapeSimplify());
+  } else if (url.includes("joinhandshake.com")) {
+    Object.assign(data, scrapeHandshake());
   }
 
   return data;

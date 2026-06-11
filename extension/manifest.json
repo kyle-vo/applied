@@ -20,7 +20,10 @@
         "https://*.myworkdayjobs.com/*",
         "https://jobs.ashbyhq.com/*",
         "https://*.jobvite.com/*",
-        "https://jobs.smartrecruiters.com/*"
+        "https://jobs.smartrecruiters.com/*",
+        "https://simplify.jobs/*",
+        "https://app.joinhandshake.com/*",
+        "https://joinhandshake.com/*"
       ],
       "js": ["content.js"],
       "run_at": "document_idle"
