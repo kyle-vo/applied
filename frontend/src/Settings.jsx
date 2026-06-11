@@ -8,7 +8,6 @@ export default function Settings() {
   const [resumes, setResumes] = useState([]);
   const [newName, setNewName] = useState("");
   const [newText, setNewText] = useState("");
-  const [tokenCopied, setTokenCopied] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -17,9 +16,46 @@ export default function Settings() {
   const api = useApi();
   const { getToken } = useAuth();
 
+  // API key state
+  const [apiKeys, setApiKeys] = useState([]);
+  const [generatedKey, setGeneratedKey] = useState(null);
+  const [keyCopied, setKeyCopied] = useState(false);
+  const [generatingKey, setGeneratingKey] = useState(false);
+
   useEffect(() => {
     api.get("/resumes").then((data) => setResumes(data.resumes)).catch(() => {});
+    api.get("/keys").then((data) => setApiKeys(data.keys)).catch(() => {});
   }, []);
+
+  async function handleGenerateKey() {
+    setGeneratingKey(true);
+    setGeneratedKey(null);
+    try {
+      const data = await api.post("/keys", {});
+      setGeneratedKey(data.key);
+      setApiKeys((prev) => [{ id: data.id, prefix: data.prefix, created_at: new Date().toISOString() }, ...prev]);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setGeneratingKey(false);
+    }
+  }
+
+  async function handleRevokeKey(id) {
+    try {
+      await api.delete(`/keys/${id}`);
+      setApiKeys((prev) => prev.filter((k) => k.id !== id));
+      if (generatedKey) setGeneratedKey(null);
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function handleCopyKey() {
+    await navigator.clipboard.writeText(generatedKey);
+    setKeyCopied(true);
+    setTimeout(() => setKeyCopied(false), 3000);
+  }
 
   function flashSaved(id) {
     setSavedId(id);
@@ -93,33 +129,63 @@ export default function Settings() {
     }
   }
 
-  async function handleCopyToken() {
-    const token = await getToken();
-    await navigator.clipboard.writeText(token);
-    setTokenCopied(true);
-    setTimeout(() => setTokenCopied(false), 3000);
-  }
-
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <h1 className="text-2xl font-semibold text-gray-900">Settings</h1>
 
-      {/* Browser Extension */}
+      {/* Browser Extension API Key */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">
         <h2 className="text-base font-medium text-gray-900 mb-1">Browser Extension</h2>
         <p className="text-sm text-gray-500 mb-4">
-          Copy your auth token to connect the Applied browser extension.
-          Paste it in the extension's settings page.
+          Generate an API key to connect the Applied browser extension. Paste it in the
+          extension's settings page — it never expires, so you only do this once.
         </p>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handleCopyToken}
-            className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            Copy Token
-          </button>
-          {tokenCopied && <span className="text-sm text-green-600 font-medium">Copied!</span>}
-        </div>
+
+        <button
+          onClick={handleGenerateKey}
+          disabled={generatingKey}
+          className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+        >
+          {generatingKey ? "Generating…" : "Generate API Key"}
+        </button>
+
+        {generatedKey && (
+          <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <p className="text-xs font-medium text-yellow-800 mb-2">
+              Copy this key now — it won't be shown again.
+            </p>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 text-xs font-mono text-gray-800 bg-white border border-gray-200 rounded px-2 py-1 break-all">
+                {generatedKey}
+              </code>
+              <button
+                onClick={handleCopyKey}
+                className="shrink-0 px-3 py-1 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                {keyCopied ? "Copied!" : "Copy"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {apiKeys.length > 0 && (
+          <div className="mt-4 space-y-2">
+            <p className="text-xs font-medium text-gray-500">Active keys</p>
+            {apiKeys.map((k) => (
+              <div key={k.id} className="flex items-center justify-between p-2 rounded-lg border border-gray-100 bg-gray-50">
+                <span className="text-xs font-mono text-gray-700">
+                  {k.prefix}… <span className="text-gray-400 font-sans">created {new Date(k.created_at).toLocaleDateString()}</span>
+                </span>
+                <button
+                  onClick={() => handleRevokeKey(k.id)}
+                  className="text-xs text-red-500 hover:text-red-700 font-medium"
+                >
+                  Revoke
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Saved resumes */}

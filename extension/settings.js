@@ -1,21 +1,21 @@
 const $ = (id) => document.getElementById(id);
 
-const API_URL = "https://backend-production-ab8c.up.railway.app/api";
+const API_URL = "https://backend-production-e4a61.up.railway.app/api";
 
-// Load saved token
-chrome.storage.sync.get(["token"], ({ token }) => {
-  if (token) $("token").value = token;
+// Load saved API key
+chrome.storage.sync.get(["apiKey"], ({ apiKey }) => {
+  if (apiKey) $("apiKey").value = apiKey;
 });
 
 $("saveBtn").addEventListener("click", () => {
-  const token = $("token").value.trim();
+  const apiKey = $("apiKey").value.trim();
 
-  if (!token) {
-    showMsg("Token is required.", "error");
+  if (!apiKey) {
+    showMsg("API key is required.", "error");
     return;
   }
 
-  chrome.storage.sync.set({ token }, () => {
+  chrome.storage.sync.set({ apiKey }, () => {
     showMsg("Settings saved!", "success");
   });
 });

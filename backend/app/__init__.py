@@ -40,10 +40,12 @@ def create_app():
     from app.routes.health import health_bp
     from app.routes.settings import settings_bp
     from app.routes.resumes import resumes_bp
+    from app.routes.keys import keys_bp
 
     app.register_blueprint(health_bp)
     app.register_blueprint(applications_bp, url_prefix="/api")
     app.register_blueprint(settings_bp, url_prefix="/api")
     app.register_blueprint(resumes_bp, url_prefix="/api")
+    app.register_blueprint(keys_bp, url_prefix="/api")
 
     return app

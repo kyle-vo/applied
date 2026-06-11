@@ -71,9 +71,22 @@ def verify_clerk_token(token: str) -> dict:
 
 
 def require_auth(f):
-    """Decorator that validates the Clerk JWT and sets g.user_id."""
+    """Decorator that validates X-API-Key or Clerk JWT and sets g.user_id."""
     @wraps(f)
     def decorated(*args, **kwargs):
+        # API key auth (used by browser extension)
+        api_key_header = request.headers.get("X-API-Key", "")
+        if api_key_header:
+            import hashlib
+            from app.models.api_key import ApiKey
+            key_hash = hashlib.sha256(api_key_header.encode()).hexdigest()
+            api_key = ApiKey.query.filter_by(key_hash=key_hash).first()
+            if not api_key:
+                return jsonify({"error": "Invalid API key"}), 401
+            g.user_id = api_key.user_id
+            return f(*args, **kwargs)
+
+        # Clerk JWT auth (used by web app)
         auth_header = request.headers.get("Authorization", "")
         if not auth_header.startswith("Bearer "):
             return jsonify({"error": "Missing or invalid Authorization header"}), 401

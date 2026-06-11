@@ -63,14 +63,14 @@
   <div class="card">
     <h2>Connection</h2>
     <p>
-      Enter your Applied API URL and auth token.<br />
-      To get your token, go to your Applied app → <strong>Settings</strong> → copy the extension token.
+      Generate an API key in your Applied app → <strong>Settings</strong> → Browser Extension,
+      then paste it here. It never expires, so you only do this once.
     </p>
 
-    <input id="apiUrl" type="hidden" value="https://backend-production-ab8c.up.railway.app/api" />
+    <input id="apiUrl" type="hidden" value="https://backend-production-e4a61.up.railway.app/api" />
 
-    <label>Auth Token</label>
-    <input id="token" type="password" placeholder="Paste your Clerk token here" />
+    <label>API Key</label>
+    <input id="apiKey" type="password" placeholder="Paste your API key here (apk_…)" />
 
     <button class="btn btn-primary" id="saveBtn">Save</button>
     <div id="msg" class="msg" style="display:none"></div>

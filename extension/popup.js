@@ -10,14 +10,14 @@ function showMsg(text, type) {
 
 const API_URL = "https://backend-production-e4a61.up.railway.app/api";
 
-async function getToken() {
+async function getApiKey() {
   return new Promise((resolve) =>
-    chrome.storage.sync.get(["token"], ({ token }) => resolve(token))
+    chrome.storage.sync.get(["apiKey"], ({ apiKey }) => resolve(apiKey))
   );
 }
 
 async function init() {
-  const token = await getToken();
+  const token = await getApiKey();
 
   if (!token) {
     $("noToken").style.display = "block";
@@ -55,7 +55,7 @@ $("submitBtn").addEventListener("click", async () => {
     return;
   }
 
-  const token = await getToken();
+  const apiKey = await getApiKey();
   const btn = $("submitBtn");
   btn.disabled = true;
   btn.textContent = "Adding…";
@@ -69,7 +69,7 @@ $("submitBtn").addEventListener("click", async () => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          "X-API-Key": apiKey,
         },
         body: JSON.stringify({
           company,
@@ -83,7 +83,7 @@ $("submitBtn").addEventListener("click", async () => {
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        if (res.status === 401) throw new Error("Token expired — go to Settings → Copy Token and update the extension.");
+        if (res.status === 401) throw new Error("Invalid API key — go to Settings and paste a new key from the Applied app.");
         throw new Error(err.error || `Error ${res.status}`);
       }
 
