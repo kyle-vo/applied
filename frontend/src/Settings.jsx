@@ -8,6 +8,7 @@ export default function Settings() {
   const [resumes, setResumes] = useState([]);
   const [newName, setNewName] = useState("");
   const [newText, setNewText] = useState("");
+  const [tokenCopied, setTokenCopied] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -92,9 +93,34 @@ export default function Settings() {
     }
   }
 
+  async function handleCopyToken() {
+    const token = await getToken();
+    await navigator.clipboard.writeText(token);
+    setTokenCopied(true);
+    setTimeout(() => setTokenCopied(false), 3000);
+  }
+
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <h1 className="text-2xl font-semibold text-gray-900">Settings</h1>
+
+      {/* Browser Extension */}
+      <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <h2 className="text-base font-medium text-gray-900 mb-1">Browser Extension</h2>
+        <p className="text-sm text-gray-500 mb-4">
+          Copy your auth token to connect the Applied browser extension.
+          Paste it in the extension's settings page.
+        </p>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleCopyToken}
+            className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Copy Token
+          </button>
+          {tokenCopied && <span className="text-sm text-green-600 font-medium">Copied!</span>}
+        </div>
+      </div>
 
       {/* Saved resumes */}
       {resumes.length > 0 && (
