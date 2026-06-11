@@ -6,42 +6,51 @@ A full-stack job application tracker built by Kyle Vo. Tracks job applications t
 ## Stack
 - **Frontend:** React 18 + Vite + Tailwind CSS + Clerk (auth) + @hello-pangea/dnd (drag and drop)
 - **Backend:** Flask + SQLAlchemy + PostgreSQL + Redis
-- **Auth:** Clerk (JWT verified on every backend request via `app/middleware/auth.py`)
-- **AI:** Anthropic API — claude-sonnet-4-20250514 (Phase 2, not yet implemented)
-- **Deploy:** Railway (switching from Render.com — goal is to get this live on Railway)
+- **Auth:** Clerk (JWT verified on every backend request via `app/middleware/auth.py`) + long-lived API keys for the browser extension (`X-API-Key` header)
+- **AI:** Anthropic API — `claude-sonnet-4-6` — live in `backend/app/services/ai.py`
+- **Deploy:** Railway — live at https://frontend-production-ab8c.up.railway.app (backend: https://backend-production-e4a61.up.railway.app)
 
 ## Project structure
 ```
 applied/
-├── docker-compose.yml         # Postgres + Redis + Flask
+├── docker-compose.yml
 ├── backend/
-│   ├── wsgi.py                # Flask entrypoint
+│   ├── wsgi.py
 │   ├── requirements.txt
-│   ├── .env.example           # Copy to .env and fill in keys
 │   └── app/
-│       ├── __init__.py        # App factory (create_app)
-│       ├── middleware/auth.py # Clerk JWT verification + @require_auth decorator
-│       ├── models/application.py  # Application model + ApplicationStatus enum
-│       ├── routes/applications.py # CRUD endpoints
-│       └── routes/health.py   # GET /health
+│       ├── __init__.py                        # App factory
+│       ├── middleware/auth.py                 # Clerk JWT + X-API-Key auth, @require_auth
+│       ├── models/application.py              # Application model
+│       ├── models/api_key.py                  # ApiKey model (api_keys table)
+│       ├── models/resume.py                   # Resume model
+│       ├── routes/applications.py             # CRUD + POST /analyze
+│       ├── routes/keys.py                     # GET/POST /api/keys, DELETE /api/keys/:id
+│       ├── routes/resumes.py
+│       ├── routes/settings.py
+│       ├── routes/health.py
+│       └── services/ai.py                     # analyze_match() — calls Claude
 └── frontend/
-    ├── .env.example           # Copy to .env, add VITE_CLERK_PUBLISHABLE_KEY
     └── src/
-        ├── lib/api.js         # Authenticated fetch wrapper (useApi hook)
-        ├── hooks/useApplications.js  # Central data hook used by all pages
-        ├── components/
-        │   ├── Navbar.jsx
-        │   ├── KanbanBoard.jsx    # Drag and drop, calls updateStatus on drop
-        │   ├── JobModal.jsx       # Add/edit modal, includes job_description field
-        │   └── MatchBadge.jsx     # Color-coded score badge (green/yellow/red)
-        └── pages/
-            ├── Dashboard.jsx      # Stats cards + kanban board
-            ├── Applications.jsx   # Filterable table with full CRUD
-            └── Analysis.jsx       # AI analysis page (Phase 2 placeholder)
+        ├── api.js                             # useApi hook (auto-attaches auth)
+        ├── useApplications.js                 # Central data hook
+        ├── App.jsx
+        ├── Navbar.jsx
+        ├── Dashboard.jsx
+        ├── Applications.jsx
+        ├── Analysis.jsx                       # Collapsible scored cards + Re-analyze
+        ├── Settings.jsx                       # Resume upload + API key management
+        ├── KanbanBoard.jsx
+        ├── JobModal.jsx
+        └── MatchBadge.jsx
+extension/
+    ├── manifest.json
+    ├── popup.html / popup.js                  # Uses X-API-Key header (not Bearer JWT)
+    ├── settings.html / settings.js            # Stores apiKey in chrome.storage.sync
+    └── content.js
 ```
 
 ## API endpoints
-All endpoints require `Authorization: Bearer <clerk_token>` header.
+All endpoints require either `Authorization: Bearer <clerk_token>` or `X-API-Key: <key>`.
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -51,21 +60,29 @@ All endpoints require `Authorization: Bearer <clerk_token>` header.
 | GET | /api/applications/:id | Get single |
 | PATCH | /api/applications/:id | Update fields |
 | DELETE | /api/applications/:id | Delete |
+| POST | /api/applications/:id/analyze | Run AI match scoring (1hr Redis cache, ?force=true to bypass) |
+| GET | /api/keys | List API keys |
+| POST | /api/keys | Generate new API key (returns raw key once) |
+| DELETE | /api/keys/:id | Revoke API key |
+| GET/POST | /api/resumes | Resume management |
 
-### Application fields
-```python
-company          # str, required
-role             # str, required
-location         # str, optional
-job_url          # str, optional
-job_description  # text, optional — used for AI scoring
-status           # enum: applied | screening | interview | offer | rejected | withdrawn
-ai_match_score   # int 0-100, set by AI service
-ai_analysis      # JSON: { strengths: [], gaps: [], keywords: [] }
-notes            # text, optional
-follow_up_at     # datetime, optional
-applied_at       # datetime, auto
-```
+## Auth flows
+- **Web app:** Clerk JWT via `Authorization: Bearer` header — auto-attached by `useApi` hook
+- **Browser extension:** Long-lived API key via `X-API-Key` header — generated once in Settings, stored in `chrome.storage.sync` as `apiKey`, never expires
+- `@require_auth` checks `X-API-Key` first, falls back to Clerk JWT
+
+## AI scoring
+- Route: `POST /api/applications/:id/analyze`
+- Requires a job description on the application and at least one saved resume
+- Calls `backend/app/services/ai.py → analyze_match(job_description, resume_text)`
+- Model: `claude-sonnet-4-6`, returns `{ score, strengths[], gaps[], keywords[] }`
+- Scoring rubric: 90-100 exceptional, 75-89 strong, 60-74 moderate, 40-59 weak, 0-39 poor
+- Results cached in Redis for 1 hour (`analysis:{app_id}`); Re-analyze passes `?force=true` to bypass
+- Analysis.jsx shows collapsible cards sorted by score
+
+## Database migrations
+Latest migration: `d5a3b1e9f2c6` (adds `api_keys` table)
+To apply on Railway: open backend Console → `flask db upgrade`
 
 ## Environment variables
 
@@ -87,76 +104,38 @@ VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
 ```
 
 ## Running locally
-
-### Backend
 ```bash
-cd applied
-docker-compose up           # starts Postgres + Redis + Flask on :5000
-# First time only:
-cd backend
-flask db init
-flask db migrate -m "init"
-flask db upgrade
+# Backend
+cd applied && docker-compose up
+cd backend && flask db upgrade
+
+# Frontend
+cd applied/frontend && npm install && npm run dev
 ```
 
-### Frontend
-```bash
-cd applied/frontend
-cp .env.example .env        # add your Clerk publishable key
-npm install
-npm run dev                 # runs on :3000, proxies /api to :5000
-```
-
-### Verify it works
-- Backend: http://localhost:5000/health → `{"api":"ok","db":"ok","redis":"ok"}`
-- Frontend: http://localhost:3000 → redirects to Clerk sign-in
-
-## What's done (Phase 1)
+## What's done
 - [x] Docker Compose setup (Postgres + Redis + Flask)
-- [x] Flask app factory with SQLAlchemy + Flask-Migrate
-- [x] Clerk JWT auth middleware (`@require_auth` decorator)
+- [x] Clerk JWT auth + long-lived API key auth for extension
 - [x] Full CRUD for applications with summary stats
-- [x] React + Vite + Tailwind frontend
-- [x] Clerk auth integration (sign in/out, protected routes)
 - [x] Kanban board with drag-and-drop status updates
-- [x] Add/edit/delete modal with job description field
 - [x] Applications list page with search + status filter
 - [x] Follow-up date tracking
+- [x] AI match scoring via Claude (analyze_match, collapsible Analysis page)
+- [x] Resume upload/management (PDF + plain text)
+- [x] Chrome extension — scrapes JD, submits via API key auth
+- [x] Settings page — resume management + API key generate/revoke
+- [x] Deployed on Railway (frontend + backend + Postgres + Redis)
+- [x] UTC timestamp fix (applied_at displays correctly in local time)
 
-## Kyle's goals for this project
-1. **Deploy to Railway** — ✅ done, live at https://frontend-production-ab8c.up.railway.app (backend: https://backend-production-e4a61.up.railway.app)
-2. **Resume project** — ✅ Applied is on Kyle's resume as a shipped full-stack AI app with Chrome extension
-
-## Next session: Long-lived API key for browser extension
-The Chrome extension currently uses Clerk JWTs copied from the Settings page, which expire every ~15 minutes. Fix: add a long-lived API key system so the extension never needs a token refresh.
-
-**What to build:**
-1. `backend/app/models/api_key.py` — `api_keys` table: `id`, `user_id`, `key_hash` (SHA-256), `prefix` (first 8 chars for display), `created_at`
-2. `backend/app/routes/keys.py` — `POST /api/keys` (generate), `DELETE /api/keys/:id` (revoke), `GET /api/keys` (list)
-3. `backend/app/middleware/auth.py` — update `@require_auth` to accept either Clerk JWT **or** `X-API-Key: <key>` header
-4. `backend/migrations/` — new migration for `api_keys` table
-5. `frontend/src/Settings.jsx` — "Extension Token" section: Generate button shows the key once (copy it), lists existing keys with revoke button
-6. `extension/popup.js` + `extension/settings.js` — switch from Clerk JWT to API key (stored in `chrome.storage.sync` as `apiKey`)
-
-## What's next (Phase 2 — AI scoring)
-The `job_description` field is already stored. The plan:
-
-1. Create `backend/app/services/ai.py` — call Anthropic API with:
-   - Kyle's resume (stored as a constant or uploaded via settings)
-   - The job description
-   - Prompt asking for match score (0-100), strengths[], gaps[], keywords[]
-   - Return structured JSON
-
-2. Add `POST /api/applications/:id/analyze` route that:
-   - Calls the AI service
-   - Updates `ai_match_score` and `ai_analysis` on the application
-   - Caches result in Redis (key: `analysis:{app_id}`) to avoid repeat API calls
-
-3. Wire up `Analysis.jsx` to trigger analysis and display results per application
+## Kyle's goals
+1. **Deploy to Railway** — ✅ live
+2. **Resume project** — ✅ on resume as shipped full-stack AI app with Chrome extension
 
 ## Key design decisions
 - **Clerk for auth** — saves time vs rolling JWT, handles session management
+- **API keys for extension** — long-lived SHA-256 hashed keys; extension never needs to refresh
 - **`useApplications` hook** — single source of truth for all app data, avoids prop drilling
-- **`useApi` hook** — auto-attaches Clerk token to every request, no manual auth headers anywhere
+- **`useApi` hook** — auto-attaches Clerk token to every request
 - **Kanban drag-and-drop** — uses `@hello-pangea/dnd` (maintained fork of react-beautiful-dnd)
 - **Vite proxy** — frontend dev server proxies `/api` to Flask, no CORS issues in dev
+- **1hr Redis cache on analysis** — avoids repeat Claude API calls; Re-analyze bypasses with `?force=true`
