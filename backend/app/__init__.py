@@ -1,9 +1,10 @@
 import os
 from pathlib import Path
 from dotenv import load_dotenv
-from flask import Flask, request
+from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
+from flask_cors import CORS
 import redis
 
 # Load local environment variables from backend/.env when available.
@@ -28,23 +29,7 @@ def create_app():
     db.init_app(app)
     migrate.init_app(app, db)
 
-    @app.before_request
-    def handle_preflight():
-        if request.method == "OPTIONS":
-            from flask import make_response
-            res = make_response()
-            res.headers["Access-Control-Allow-Origin"] = "*"
-            res.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type"
-            res.headers["Access-Control-Allow-Methods"] = "GET, POST, PATCH, DELETE, OPTIONS"
-            res.status_code = 204
-            return res
-
-    @app.after_request
-    def add_cors_headers(response):
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type"
-        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PATCH, DELETE, OPTIONS"
-        return response
+    CORS(app, resources={r"/api/*": {"origins": "*"}})
 
     # Redis
     global redis_client
