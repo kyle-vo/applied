@@ -168,6 +168,14 @@ def analyze_application(app_id):
         return jsonify({"error": "No job description — add one before analyzing"}), 400
 
     cache_key = f"analysis:{app_id}"
+    force = request.args.get("force") == "true"
+    try:
+        if not force:
+            cached = redis_client.get(cache_key)
+            if cached:
+                return jsonify(json.loads(cached))
+    except Exception:
+        pass
 
     from app.models.resume import Resume
     data = request.get_json(silent=True) or {}
@@ -193,7 +201,13 @@ def analyze_application(app_id):
     }
     db.session.commit()
 
-    return jsonify(app_entry.to_dict())
+    response_data = app_entry.to_dict()
+    try:
+        redis_client.setex(cache_key, 3600, json.dumps(response_data))
+    except Exception:
+        pass
+
+    return jsonify(response_data)
 
 
 # ── GET /api/applications/statuses ────────────────────────────────────────────
