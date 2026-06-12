@@ -34,7 +34,12 @@ function ScoredCard({ app, analyzing, error, onAnalyze }) {
         onClick={() => setOpen((v) => !v)}
       >
         <div className="flex items-center gap-3 min-w-0">
-          <span className="text-gray-400 text-xs">{open ? "▾" : "▸"}</span>
+          <svg
+            className={`w-4 h-4 text-gray-400 shrink-0 transition-transform ${open ? "rotate-90" : ""}`}
+            fill="none" stroke="currentColor" viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
           <div className="min-w-0">
             <p className="font-medium text-gray-900 truncate">{app.company}</p>
             <p className="text-sm text-gray-500 truncate">{app.role}</p>
