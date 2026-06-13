@@ -5,6 +5,7 @@ const links = [
   { to: "/dashboard", label: "Dashboard" },
   { to: "/applications", label: "Applications" },
   { to: "/analysis", label: "AI Analysis" },
+  { to: "/analytics", label: "Analytics" },
   { to: "/settings", label: "Settings" },
 ];
 

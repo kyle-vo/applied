@@ -4,6 +4,7 @@ import Navbar from "./Navbar";
 import Dashboard from "./Dashboard";
 import Applications from "./Applications";
 import Analysis from "./Analysis";
+import Analytics from "./Analytics";
 import Settings from "./Settings";
 
 function ProtectedLayout({ children }) {
@@ -39,6 +40,10 @@ export default function App() {
       <Route
         path="/analysis"
         element={<ProtectedLayout><Analysis /></ProtectedLayout>}
+      />
+      <Route
+        path="/analytics"
+        element={<ProtectedLayout><Analytics /></ProtectedLayout>}
       />
       <Route
         path="/settings"
