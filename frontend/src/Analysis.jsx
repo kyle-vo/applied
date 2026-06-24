@@ -1,13 +1,6 @@
 import { useState } from "react";
 import { useApplications } from "./useApplications";
-
-function ScoreRing({ score }) {
-  const color =
-    score >= 80 ? "text-green-600" : score >= 60 ? "text-yellow-500" : "text-red-500";
-  return (
-    <span className={`text-2xl font-bold tabular-nums ${color}`}>{score}%</span>
-  );
-}
+import { useToast } from "./Toast";
 
 function ScoreBadge({ score }) {
   const cls =
@@ -23,12 +16,43 @@ function ScoreBadge({ score }) {
   );
 }
 
-function ScoredCard({ app, analyzing, error, onAnalyze, tailoring, tailorResult, tailorError, onTailor }) {
+function CopyButton({ text, label = "Copy" }) {
+  const [copied, setCopied] = useState(false);
+  async function handleCopy(e) {
+    e.stopPropagation();
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
+  return (
+    <button onClick={handleCopy} className="text-xs text-gray-400 hover:text-gray-600 underline">
+      {copied ? "Copied!" : label}
+    </button>
+  );
+}
+
+function formatAllSuggestions(tailor) {
+  const parts = [];
+  if (tailor.tailored_summary) {
+    parts.push("TAILORED SUMMARY\n" + tailor.tailored_summary);
+  }
+  if (tailor.rewrites?.length > 0) {
+    parts.push(
+      "SUGGESTED REWRITES\n" +
+        tailor.rewrites.map((r) => `${r.context}\n${r.suggested}\nWhy: ${r.why}`).join("\n\n")
+    );
+  }
+  if (tailor.keywords_to_add?.length > 0) {
+    parts.push("KEYWORDS TO ADD\n" + tailor.keywords_to_add.join(", "));
+  }
+  return parts.join("\n\n");
+}
+
+function ScoredCard({ app, analyzing, error, onAnalyze, tailoring, tailorError, onTailor }) {
   const [open, setOpen] = useState(false);
 
   return (
     <div className="card overflow-hidden">
-      {/* Header row — always visible */}
       <button
         className="w-full flex items-center justify-between gap-4 p-4 text-left hover:bg-gray-50 transition-colors"
         onClick={() => setOpen((v) => !v)}
@@ -52,7 +76,7 @@ function ScoredCard({ app, analyzing, error, onAnalyze, tailoring, tailorResult,
             disabled={tailoring}
             className="text-xs text-indigo-400 hover:text-indigo-600 underline disabled:opacity-50"
           >
-            {tailoring ? "Tailoring…" : tailorResult ? "Re-tailor" : "Tailor resume"}
+            {tailoring ? "Tailoring…" : app.ai_tailor ? "Re-tailor" : "Tailor resume"}
           </button>
           <button
             onClick={() => onAnalyze(app.id, true)}
@@ -64,7 +88,6 @@ function ScoredCard({ app, analyzing, error, onAnalyze, tailoring, tailorResult,
         </div>
       </button>
 
-      {/* Expandable detail */}
       {open && (
         <div className="px-5 pb-5 space-y-4 border-t border-gray-100">
           {error && <p className="text-xs text-red-500 pt-3">{error}</p>}
@@ -131,31 +154,36 @@ function ScoredCard({ app, analyzing, error, onAnalyze, tailoring, tailorResult,
             </div>
           )}
 
-          {/* Tailoring results */}
           {tailorError && (
             <div className="border-t border-gray-100 pt-4">
               <p className="text-xs text-red-500">{tailorError}</p>
             </div>
           )}
 
-          {tailorResult && (
+          {app.ai_tailor && (
             <div className="border-t border-gray-100 pt-4 space-y-4">
-              <p className="text-xs font-semibold text-indigo-700">Tailoring Suggestions</p>
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold text-indigo-700">Tailoring Suggestions</p>
+                <CopyButton text={formatAllSuggestions(app.ai_tailor)} label="Copy all" />
+              </div>
 
-              {tailorResult.tailored_summary && (
+              {app.ai_tailor.tailored_summary && (
                 <div>
-                  <p className="text-xs font-medium text-gray-500 mb-1.5">Tailored summary</p>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <p className="text-xs font-medium text-gray-500">Tailored summary</p>
+                    <CopyButton text={app.ai_tailor.tailored_summary} />
+                  </div>
                   <blockquote className="text-xs text-gray-700 bg-indigo-50 border-l-2 border-indigo-300 pl-3 py-2 rounded-r-md italic">
-                    {tailorResult.tailored_summary}
+                    {app.ai_tailor.tailored_summary}
                   </blockquote>
                 </div>
               )}
 
-              {tailorResult.rewrites?.length > 0 && (
+              {app.ai_tailor.rewrites?.length > 0 && (
                 <div>
                   <p className="text-xs font-medium text-gray-500 mb-2">Suggested rewrites</p>
                   <div className="space-y-3">
-                    {tailorResult.rewrites.map((r, i) => (
+                    {app.ai_tailor.rewrites.map((r, i) => (
                       <div key={i} className="bg-gray-50 rounded-lg p-3 space-y-1">
                         <p className="text-xs text-gray-400 font-medium">{r.context}</p>
                         <p className="text-xs text-gray-800">{r.suggested}</p>
@@ -166,11 +194,11 @@ function ScoredCard({ app, analyzing, error, onAnalyze, tailoring, tailorResult,
                 </div>
               )}
 
-              {tailorResult.keywords_to_add?.length > 0 && (
+              {app.ai_tailor.keywords_to_add?.length > 0 && (
                 <div>
                   <p className="text-xs font-medium text-gray-500 mb-1.5">Keywords to add</p>
                   <div className="flex flex-wrap gap-1.5">
-                    {tailorResult.keywords_to_add.map((kw, i) => (
+                    {app.ai_tailor.keywords_to_add.map((kw, i) => (
                       <span key={i} className="text-xs px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">
                         + {kw}
                       </span>
@@ -188,16 +216,14 @@ function ScoredCard({ app, analyzing, error, onAnalyze, tailoring, tailorResult,
 
 export default function Analysis() {
   const { applications, loading, analyzeApplication, tailorApplication } = useApplications();
+  const { addToast } = useToast();
   const [analyzing, setAnalyzing] = useState(new Set());
   const [errors, setErrors] = useState({});
   const [tailoring, setTailoring] = useState(new Set());
-  const [tailorResults, setTailorResults] = useState({});
   const [tailorErrors, setTailorErrors] = useState({});
 
   const scored = applications.filter((a) => a.ai_match_score != null);
-  const unscored = applications.filter(
-    (a) => a.ai_match_score == null && a.job_description
-  );
+  const unscored = applications.filter((a) => a.ai_match_score == null && a.job_description);
   const noJd = applications.filter((a) => !a.job_description);
 
   async function handleAnalyze(id, force = false) {
@@ -205,6 +231,7 @@ export default function Analysis() {
     setAnalyzing((prev) => new Set([...prev, id]));
     try {
       await analyzeApplication(id, { force });
+      addToast("Analysis complete");
     } catch (err) {
       setErrors((prev) => ({ ...prev, [id]: err.message }));
     } finally {
@@ -220,8 +247,8 @@ export default function Analysis() {
     setTailorErrors((prev) => { const e = { ...prev }; delete e[id]; return e; });
     setTailoring((prev) => new Set([...prev, id]));
     try {
-      const result = await tailorApplication(id);
-      setTailorResults((prev) => ({ ...prev, [id]: result }));
+      await tailorApplication(id);
+      addToast("Tailoring suggestions ready");
     } catch (err) {
       setTailorErrors((prev) => ({ ...prev, [id]: err.message }));
     } finally {
@@ -235,9 +262,7 @@ export default function Analysis() {
 
   if (loading)
     return (
-      <div className="flex items-center justify-center h-64 text-gray-400 text-sm">
-        Loading…
-      </div>
+      <div className="flex items-center justify-center h-64 text-gray-400 text-sm">Loading…</div>
     );
 
   const hasAnything = scored.length > 0 || unscored.length > 0;
@@ -303,7 +328,6 @@ export default function Analysis() {
                 error={errors[app.id]}
                 onAnalyze={handleAnalyze}
                 tailoring={tailoring.has(app.id)}
-                tailorResult={tailorResults[app.id]}
                 tailorError={tailorErrors[app.id]}
                 onTailor={handleTailor}
               />

@@ -6,6 +6,7 @@ import Applications from "./Applications";
 import Analysis from "./Analysis";
 import Analytics from "./Analytics";
 import Settings from "./Settings";
+import { ToastProvider } from "./Toast";
 
 function ProtectedLayout({ children }) {
   return (
@@ -27,6 +28,7 @@ function ProtectedLayout({ children }) {
 
 export default function App() {
   return (
+    <ToastProvider>
     <Routes>
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route
@@ -64,5 +66,6 @@ export default function App() {
       <Route path="/sign-in/*" element={<SignIn />} />
       <Route path="/sign-up/*" element={<SignUp />} />
     </Routes>
+    </ToastProvider>
   );
 }

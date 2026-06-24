@@ -35,6 +35,7 @@ class Application(db.Model):
     # AI analysis
     ai_match_score = db.Column(db.Integer)       # 0-100
     ai_analysis = db.Column(db.JSON)             # {strengths: [], gaps: [], keywords: []}
+    ai_tailor = db.Column(db.JSON)               # {tailored_summary, rewrites[], keywords_to_add[]}
 
     # Dates
     applied_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
@@ -59,6 +60,7 @@ class Application(db.Model):
             "status": self.status.value,
             "ai_match_score": self.ai_match_score,
             "ai_analysis": self.ai_analysis,
+            "ai_tailor": self.ai_tailor,
             "applied_at": self.applied_at.isoformat() + "Z" if self.applied_at else None,
             "follow_up_at": self.follow_up_at.isoformat() + "Z" if self.follow_up_at else None,
             "updated_at": self.updated_at.isoformat() + "Z" if self.updated_at else None,

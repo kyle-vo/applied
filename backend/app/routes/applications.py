@@ -236,15 +236,9 @@ def tailor_application(app_id):
     if not app_entry.job_description:
         return jsonify({"error": "No job description — add one before tailoring"}), 400
 
-    cache_key = f"tailor:{app_id}"
     force = request.args.get("force") == "true"
-    try:
-        if not force:
-            cached = redis_client.get(cache_key)
-            if cached:
-                return jsonify(json.loads(cached))
-    except Exception:
-        pass
+    if not force and app_entry.ai_tailor:
+        return jsonify(app_entry.to_dict())
 
     from app.models.resume import Resume
     data = request.get_json(silent=True) or {}
@@ -262,12 +256,10 @@ def tailor_application(app_id):
     except Exception as e:
         return jsonify({"error": f"AI tailoring failed: {str(e)}"}), 502
 
-    try:
-        redis_client.setex(cache_key, 3600, json.dumps(result))
-    except Exception:
-        pass
+    app_entry.ai_tailor = result
+    db.session.commit()
 
-    return jsonify(result)
+    return jsonify(app_entry.to_dict())
 
 
 # ── GET /api/applications/statuses ────────────────────────────────────────────

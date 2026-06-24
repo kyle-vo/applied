@@ -56,7 +56,9 @@ export function useApplications() {
 
   async function tailorApplication(id, { force = false } = {}) {
     const url = `/applications/${id}/tailor${force ? "?force=true" : ""}`;
-    return api.post(url, {});
+    const updated = await api.post(url, {});
+    setApplications((prev) => prev.map((a) => (a.id === id ? updated : a)));
+    return updated;
   }
 
   return {

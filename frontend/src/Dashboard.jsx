@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useApplications } from "./useApplications";
 import KanbanBoard from "./KanbanBoard";
 import JobModal from "./JobModal";
+import { useToast } from "./Toast";
 
 function StatCard({ label, value, sub }) {
   return (
@@ -15,8 +16,19 @@ function StatCard({ label, value, sub }) {
 
 export default function Dashboard() {
   const { applications, summary, loading, error, createApplication, updateApplication, updateStatus } = useApplications();
+  const { addToast } = useToast();
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
+
+  async function handleSave(body, opts) {
+    if (editing) {
+      await updateApplication(editing.id, body);
+      addToast("Application updated");
+    } else {
+      await createApplication(body, opts);
+      addToast("Application added");
+    }
+  }
 
   if (loading) return (
     <div className="flex items-center justify-center h-64 text-gray-400 text-sm">Loading…</div>
@@ -83,10 +95,7 @@ export default function Dashboard() {
       <JobModal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        onSave={editing
-          ? (body) => updateApplication(editing.id, body)
-          : createApplication
-        }
+        onSave={handleSave}
         initial={editing}
       />
     </div>

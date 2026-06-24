@@ -3,6 +3,7 @@ import { useApplications } from "./useApplications";
 import JobModal from "./JobModal";
 import MatchBadge from "./MatchBadge";
 import { formatDistanceToNow } from "date-fns";
+import { useToast } from "./Toast";
 
 const STATUS_COLORS = {
   applied:   "bg-blue-100 text-blue-700",
@@ -18,6 +19,7 @@ export default function Applications() {
     applications, loading, error,
     createApplication, updateApplication, deleteApplication,
   } = useApplications();
+  const { addToast } = useToast();
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -27,17 +29,20 @@ export default function Applications() {
   function openAdd() { setEditing(null); setModalOpen(true); }
   function openEdit(app) { setEditing(app); setModalOpen(true); }
 
-  async function handleSave(body) {
+  async function handleSave(body, opts) {
     if (editing) {
       await updateApplication(editing.id, body);
+      addToast("Application updated");
     } else {
-      await createApplication(body);
+      await createApplication(body, opts);
+      addToast("Application added");
     }
   }
 
   async function handleDelete(app) {
     if (window.confirm(`Delete ${app.company} — ${app.role}?`)) {
       await deleteApplication(app.id);
+      addToast("Application deleted");
     }
   }
 
