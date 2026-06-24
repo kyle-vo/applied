@@ -55,3 +55,46 @@ Respond with ONLY a valid JSON object — no markdown, no commentary:
     )
 
     return json.loads(message.content[0].text)
+
+
+def tailor_resume(job_description: str, resume_text: str) -> dict:
+    """Call Claude to produce specific resume tailoring suggestions for a JD."""
+    api_key = current_app.config.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_API_KEY", "")
+    client = anthropic.Anthropic(api_key=api_key)
+
+    message = client.messages.create(
+        model="claude-sonnet-4-6",
+        max_tokens=2048,
+        messages=[
+            {
+                "role": "user",
+                "content": f"""You are a professional resume coach. Given a resume and a job description, produce specific, actionable suggestions to tailor the resume for this role.
+
+Resume:
+{resume_text}
+
+Job Description:
+{job_description}
+
+Rules:
+- Rewrite suggestions must be concrete and copy-pasteable — not vague advice like "emphasize leadership".
+- The tailored summary should be written in first person as if from the candidate.
+- Only suggest keywords the candidate could plausibly claim based on their existing experience.
+
+Respond with ONLY a valid JSON object — no markdown, no commentary:
+{{
+  "tailored_summary": "<2-3 sentence professional summary optimized for this specific role>",
+  "rewrites": [
+    {{
+      "context": "<where to apply this — e.g. 'Work experience at [Company]', 'Skills section', 'Project: X'>",
+      "suggested": "<the exact text to add or use as a replacement>",
+      "why": "<one sentence explaining why this improves the match>"
+    }}
+  ],
+  "keywords_to_add": [<5-8 keywords/skills from the JD that are absent from the resume but applicable>]
+}}""",
+            }
+        ],
+    )
+
+    return json.loads(message.content[0].text)

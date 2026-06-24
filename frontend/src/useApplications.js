@@ -24,8 +24,8 @@ export function useApplications() {
 
   useEffect(() => { fetch(); }, [fetch]);
 
-  async function createApplication(body) {
-    const created = await api.post("/applications", body);
+  async function createApplication(body, { force = false } = {}) {
+    const created = await api.post(`/applications${force ? "?force=true" : ""}`, body);
     setApplications((prev) => [created, ...prev]);
     return created;
   }
@@ -54,6 +54,11 @@ export function useApplications() {
     return updated;
   }
 
+  async function tailorApplication(id, { force = false } = {}) {
+    const url = `/applications/${id}/tailor${force ? "?force=true" : ""}`;
+    return api.post(url, {});
+  }
+
   return {
     applications,
     summary,
@@ -65,5 +70,6 @@ export function useApplications() {
     deleteApplication,
     updateStatus,
     analyzeApplication,
+    tailorApplication,
   };
 }

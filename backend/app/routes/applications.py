@@ -71,6 +71,21 @@ def create_application():
     if missing:
         return jsonify({"error": f"Missing required fields: {', '.join(missing)}"}), 400
 
+    # Duplicate check — same company + role (case-insensitive) for this user
+    force = request.args.get("force") == "true"
+    if not force:
+        existing = Application.query.filter(
+            Application.user_id == g.user_id,
+            db.func.lower(Application.company) == data["company"].strip().lower(),
+            db.func.lower(Application.role) == data["role"].strip().lower(),
+        ).first()
+        if existing:
+            return jsonify({
+                "error": f"You already have a {data['role']} application at {data['company']}.",
+                "duplicate": True,
+                "existing": existing.to_dict(),
+            }), 409
+
     # Parse optional follow_up date
     follow_up_at = None
     if data.get("follow_up_at"):
@@ -208,6 +223,51 @@ def analyze_application(app_id):
         pass
 
     return jsonify(response_data)
+
+
+# ── POST /api/applications/<id>/tailor ────────────────────────────────────────
+@applications_bp.route("/applications/<int:app_id>/tailor", methods=["POST"])
+@require_auth
+def tailor_application(app_id):
+    app_entry = Application.query.filter_by(id=app_id, user_id=g.user_id).first()
+    if not app_entry:
+        return jsonify({"error": "Application not found"}), 404
+
+    if not app_entry.job_description:
+        return jsonify({"error": "No job description — add one before tailoring"}), 400
+
+    cache_key = f"tailor:{app_id}"
+    force = request.args.get("force") == "true"
+    try:
+        if not force:
+            cached = redis_client.get(cache_key)
+            if cached:
+                return jsonify(json.loads(cached))
+    except Exception:
+        pass
+
+    from app.models.resume import Resume
+    data = request.get_json(silent=True) or {}
+    resume_id = data.get("resume_id")
+    if resume_id:
+        resume = Resume.query.filter_by(id=resume_id, user_id=g.user_id).first()
+    else:
+        resume = Resume.query.filter_by(user_id=g.user_id).order_by(Resume.created_at.desc()).first()
+    if not resume:
+        return jsonify({"error": "No resume found — upload a resume in Settings first"}), 400
+
+    from app.services.ai import tailor_resume
+    try:
+        result = tailor_resume(app_entry.job_description, resume.resume_text)
+    except Exception as e:
+        return jsonify({"error": f"AI tailoring failed: {str(e)}"}), 502
+
+    try:
+        redis_client.setex(cache_key, 3600, json.dumps(result))
+    except Exception:
+        pass
+
+    return jsonify(result)
 
 
 # ── GET /api/applications/statuses ────────────────────────────────────────────

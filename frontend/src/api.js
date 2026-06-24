@@ -18,8 +18,10 @@ export function useApi() {
     });
 
     if (!res.ok) {
-      const err = await res.json().catch(() => ({ error: res.statusText }));
-      throw new Error(err.error || `Request failed: ${res.status}`);
+      const body = await res.json().catch(() => ({ error: res.statusText }));
+      const err = new Error(body.error || `Request failed: ${res.status}`);
+      if (body.duplicate) err.duplicate = body.existing;
+      throw err;
     }
 
     return res.json();

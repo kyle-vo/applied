@@ -17,9 +17,11 @@ export default function JobModal({ open, onClose, onSave, initial }) {
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [duplicateOf, setDuplicateOf] = useState(null);
 
   useEffect(() => {
     if (open) {
+      setDuplicateOf(null);
       setForm(initial ? {
         company: initial.company ?? "",
         role: initial.role ?? "",
@@ -40,21 +42,23 @@ export default function JobModal({ open, onClose, onSave, initial }) {
     setForm((f) => ({ ...f, [field]: value }));
   }
 
-  async function handleSave() {
+  async function handleSave(force = false) {
     if (!form.company.trim() || !form.role.trim()) {
       setError("Company and role are required.");
       return;
     }
     setSaving(true);
     setError(null);
+    setDuplicateOf(null);
     try {
-      await onSave({
-        ...form,
-        follow_up_at: form.follow_up_at || null,
-      });
+      await onSave({ ...form, follow_up_at: form.follow_up_at || null }, { force });
       onClose();
     } catch (err) {
-      setError(err.message);
+      if (err.duplicate) {
+        setDuplicateOf(err.duplicate);
+      } else {
+        setError(err.message);
+      }
     } finally {
       setSaving(false);
     }
@@ -77,6 +81,30 @@ export default function JobModal({ open, onClose, onSave, initial }) {
           {error && (
             <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
               {error}
+            </div>
+          )}
+
+          {duplicateOf && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5">
+              <p className="text-sm font-medium text-amber-800">Possible duplicate</p>
+              <p className="text-xs text-amber-700 mt-0.5">
+                You already have a <strong>{duplicateOf.role}</strong> application at <strong>{duplicateOf.company}</strong> (status: {duplicateOf.status}).
+              </p>
+              <div className="flex gap-2 mt-2.5">
+                <button
+                  className="text-xs px-3 py-1 rounded bg-amber-200 text-amber-900 hover:bg-amber-300 font-medium"
+                  onClick={() => handleSave(true)}
+                  disabled={saving}
+                >
+                  Add anyway
+                </button>
+                <button
+                  className="text-xs px-3 py-1 rounded border border-amber-200 text-amber-700 hover:bg-amber-100"
+                  onClick={() => setDuplicateOf(null)}
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           )}
 
