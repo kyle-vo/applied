@@ -19,12 +19,15 @@ function scrapeLinkedInSearchResults() {
       for (let i = 0; i < 8; i++) {
         const text = container?.innerText?.trim() || "";
         if (text.length > role.length + 3 && text.length < 250) {
-          const lines = text.split("\n").map(l => l.trim()).filter(l => l && l !== role);
-          // Company is the first non-title, non-metadata line (short, no "·" or numbers)
-          company = lines.find(l => l.length > 1 && l.length < 60 && !l.includes("·") && !/^\d/.test(l)) || "";
-          // Location is the next line after company
-          const compIdx = lines.indexOf(company);
-          location = compIdx > -1 ? (lines[compIdx + 1] || "") : "";
+          const lines = text.split("\n").map(l => l.trim()).filter(l => l);
+          const titleIdx = lines.findIndex(l => l === role);
+          if (titleIdx > -1) {
+            // Company appears before the title in LinkedIn's card structure
+            company = lines[titleIdx - 1] || "";
+            // Location line contains "· N hours ago · ..." — strip the metadata after first "·"
+            const locRaw = lines[titleIdx + 1] || "";
+            location = locRaw.includes("·") ? locRaw.split("·")[0].trim() : locRaw;
+          }
           break;
         }
         container = container?.parentElement;
