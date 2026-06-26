@@ -1,17 +1,41 @@
 function scrapeLinkedIn() {
   const role =
     document.querySelector(".job-details-jobs-unified-top-card__job-title h1")?.innerText?.trim() ||
+    document.querySelector(".jobs-unified-top-card__job-title h1")?.innerText?.trim() ||
     document.querySelector("h1.t-24")?.innerText?.trim() ||
-    document.querySelector(".jobs-unified-top-card__job-title h1")?.innerText?.trim();
+    document.querySelector("h1.jobs-unified-top-card__job-title")?.innerText?.trim() ||
+    // search results right-panel fallbacks
+    document.querySelector(".job-details-jobs-unified-top-card__job-title")?.innerText?.trim() ||
+    document.querySelector("[class*='job-details'][class*='title'] h1")?.innerText?.trim() ||
+    document.querySelector(".jobs-search__job-details h1")?.innerText?.trim();
 
   const company =
     document.querySelector(".job-details-jobs-unified-top-card__company-name a")?.innerText?.trim() ||
-    document.querySelector(".jobs-unified-top-card__company-name a")?.innerText?.trim();
+    document.querySelector(".jobs-unified-top-card__company-name a")?.innerText?.trim() ||
+    document.querySelector(".job-details-jobs-unified-top-card__company-name")?.innerText?.trim() ||
+    document.querySelector(".jobs-unified-top-card__company-name")?.innerText?.trim() ||
+    // search results right-panel fallbacks
+    document.querySelector(".job-details-jobs-unified-top-card__primary-description-container a")?.innerText?.trim() ||
+    document.querySelector(".jobs-search__job-details a.app-aware-link")?.innerText?.trim();
 
-  const description =
+  // Prefer narrow selectors that skip LinkedIn's "How you match" / profile sections
+  let description =
     document.querySelector(".jobs-description__content .jobs-box__html-content")?.innerText?.trim() ||
-    document.querySelector("#job-details")?.innerText?.trim() ||
-    document.querySelector(".jobs-description-content__text")?.innerText?.trim();
+    document.querySelector(".jobs-description-content__text")?.innerText?.trim() ||
+    // search results right-panel fallbacks
+    document.querySelector(".jobs-description")?.innerText?.trim();
+
+  if (!description) {
+    const raw = document.querySelector("#job-details")?.innerText?.trim() || "";
+    // Cut off at LinkedIn sections that follow the actual job description
+    const cutoffs = ["Show less", "How you match", "What they're looking for", "About the company", "About the employer"];
+    let cutAt = raw.length;
+    for (const cutoff of cutoffs) {
+      const idx = raw.indexOf(cutoff);
+      if (idx > 0 && idx < cutAt) cutAt = idx;
+    }
+    description = raw.slice(0, cutAt).trim();
+  }
 
   return { role, company, description };
 }
@@ -96,55 +120,93 @@ function scrapeSimplify() {
   let description = "";
   let location = "";
 
-  // Simplify is Next.js — all job data is embedded in __NEXT_DATA__
+  // __NEXT_DATA__ only has jobPosting on the initial server render of a job page.
+  // Client-side navigation from the search list leaves it stale, so fall back to DOM.
   try {
     const raw = document.getElementById("__NEXT_DATA__")?.textContent;
     const nextData = JSON.parse(raw || "{}");
     const posting = nextData?.props?.pageProps?.jobPosting;
     if (posting) {
-      // Strip HTML tags from description
       const tmp = document.createElement("div");
       tmp.innerHTML = posting.description || "";
       description = tmp.innerText?.trim();
-
-      // Location: "Lake Forest, CA, USA" → "Lake Forest, CA"
       const loc = posting.locations?.[0]?.value || "";
       location = loc.replace(/,\s*(USA|United States)$/, "").trim();
     }
   } catch (e) {}
 
+  if (!description) {
+    description =
+      document.querySelector("[data-testid='job-description']")?.innerText?.trim() ||
+      document.querySelector("[class*='JobDescription']")?.innerText?.trim() ||
+      document.querySelector("[class*='job-description']")?.innerText?.trim() ||
+      document.querySelector("article")?.innerText?.trim() ||
+      "";
+  }
+
   return { role, company, location, description };
 }
 
 async function scrapeHandshake() {
-  const role = document.querySelector("h1")?.innerText?.trim();
-
-  // Title format: "Role | Company | Handshake"
+  const url = window.location.href;
   const titleParts = document.title.split(" | ");
-  const company =
-    (titleParts.length >= 2 ? titleParts[1].trim() : "") ||
-    document.querySelector("[data-hook='job-details-page']")?.innerText?.split("\n")[0]?.trim();
+  // Full job page: title is "Role | Company | Handshake" (3 parts)
+  // Search page:   title is "Jobs | Handshake" (2 parts — no job info in title)
+  const titleHasJobInfo = titleParts.length >= 3;
 
-  // Click "More" to expand the truncated description
+  let role, company;
+
+  if (titleHasJobInfo) {
+    role = titleParts[0]?.trim();
+    company = titleParts[1]?.trim();
+  } else {
+    // Search page: the right panel has data-hook="right-content"
+    // First line of right-content is the company name; h1 inside it is the job title
+    const rightContent = document.querySelector("[data-hook='right-content']");
+    role = rightContent?.querySelector("h1")?.innerText?.trim();
+    company = rightContent?.innerText?.trim().split("\n")[0]?.trim();
+
+    // Fallback: pull from the selected job card using the job ID in the URL
+    if (!company) {
+      const jobIdMatch = url.match(/\/job-search\/(\d+)/);
+      if (jobIdMatch) {
+        const card = document.querySelector(`[data-hook='job-result-card | ${jobIdMatch[1]}']`);
+        company = card?.innerText?.trim().split("\n")[0]?.trim();
+      }
+    }
+  }
+
+  // Expand truncated description
   const moreBtn = Array.from(document.querySelectorAll("button"))
-    .find(b => b.innerText?.trim().startsWith("More"));
+    .find((b) => b.innerText?.trim().startsWith("More"));
   if (moreBtn) {
     moreBtn.click();
     await new Promise((r) => setTimeout(r, 600));
   }
 
-  // Slice just the "Job description" section out of the full page text
-  const allText = document.querySelector("[data-hook='job-details-page']")?.innerText || "";
+  // Full job page uses job-details-page; search page uses right-content
+  const container =
+    document.querySelector("[data-hook='job-details-page']") ||
+    document.querySelector("[data-hook='right-content']");
+
+  const allText = container?.innerText || "";
   const start = allText.indexOf("Job description");
-  const end = allText.indexOf("About the employer");
+  const cutoffs = [
+    "What they're looking for", "What this job offers",
+    "About the employer", "About the Employer",
+    "Similar Jobs", "Similar jobs",
+    "You match", "Matching is based", "Summary",
+  ];
+  let end = -1;
+  for (const marker of cutoffs) {
+    const idx = allText.indexOf(marker, start + 1);
+    if (idx !== -1 && (end === -1 || idx < end)) end = idx;
+  }
   let description = "";
   if (start !== -1) {
-    description = allText
-      .slice(start + "Job description".length, end !== -1 ? end : undefined)
-      .trim();
+    description = allText.slice(start + "Job description".length, end !== -1 ? end : undefined).trim();
   }
 
-  // Location pattern: "Remote", "Hybrid", or "Onsite, based in City, ST"
   const locationMatch = allText.match(/(Remote|Hybrid|Onsite,\s*based in\s*[^\n]+)/);
   const location = locationMatch ? locationMatch[1].trim() : "";
 
@@ -176,9 +238,26 @@ async function scrape() {
   return data;
 }
 
+async function scrapeWithRetry() {
+  // Search results pages render the job panel async — wait longer before first scrape
+  const isSearchResults = window.location.href.includes("/jobs/search-results") ||
+    window.location.href.includes("/jobs/search/");
+  if (isSearchResults) {
+    await new Promise((r) => setTimeout(r, 1200));
+  }
+
+  const result = await scrape();
+  // Retry once more if still empty (panel may still be loading)
+  if (!result.role && !result.company) {
+    await new Promise((r) => setTimeout(r, 1000));
+    return scrape();
+  }
+  return result;
+}
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "SCRAPE_JOB") {
-    scrape().then(sendResponse);
+    scrapeWithRetry().then(sendResponse);
   }
   return true;
 });
