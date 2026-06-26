@@ -58,35 +58,41 @@ function scrapeLinkedIn() {
     window.location.href.includes("/jobs/search/");
   if (isSearchResults) return scrapeLinkedInSearchResults();
 
+  // LinkedIn now uses fully hashed class names — fall back to h1 + innerText parsing
   const role =
+    document.querySelector("h1")?.innerText?.trim() ||
     document.querySelector(".job-details-jobs-unified-top-card__job-title h1")?.innerText?.trim() ||
-    document.querySelector(".jobs-unified-top-card__job-title h1")?.innerText?.trim() ||
-    document.querySelector("h1.t-24")?.innerText?.trim() ||
-    document.querySelector("h1.jobs-unified-top-card__job-title")?.innerText?.trim();
+    document.querySelector(".jobs-unified-top-card__job-title h1")?.innerText?.trim();
 
-  const company =
-    document.querySelector(".job-details-jobs-unified-top-card__company-name a")?.innerText?.trim() ||
-    document.querySelector(".jobs-unified-top-card__company-name a")?.innerText?.trim() ||
-    document.querySelector(".job-details-jobs-unified-top-card__company-name")?.innerText?.trim() ||
-    document.querySelector(".jobs-unified-top-card__company-name")?.innerText?.trim();
+  // Company and location: parse from body text relative to the title
+  let company = "", location = "";
+  const bodyText = document.body.innerText;
+  if (role) {
+    const titleIdx = bodyText.indexOf(role);
+    if (titleIdx > -1) {
+      const after = bodyText.slice(titleIdx + role.length).trim();
+      const lines = after.split("\n").map(l => l.trim()).filter(l => l);
+      company = lines[0] || "";
+      const locRaw = lines[1] || "";
+      location = locRaw.includes("·") ? locRaw.split("·")[0].trim() : locRaw;
+    }
+  }
 
-  // Prefer narrow selectors that skip LinkedIn's "How you match" / profile sections
-  let description =
-    document.querySelector(".jobs-description__content .jobs-box__html-content")?.innerText?.trim() ||
-    document.querySelector(".jobs-description-content__text")?.innerText?.trim();
-
-  if (!description) {
-    const raw = document.querySelector("#job-details")?.innerText?.trim() || "";
-    const cutoffs = ["Show less", "How you match", "What they're looking for", "About the company", "About the employer"];
+  // Description: everything after "About the job", cut before noise sections
+  let description = "";
+  const aboutIdx = bodyText.indexOf("About the job");
+  if (aboutIdx > -1) {
+    const raw = bodyText.slice(aboutIdx + "About the job".length).trim();
+    const cutoffs = ["Show less", "How you match", "About the company", "About the employer", "Job search faster with Premium"];
     let cutAt = raw.length;
-    for (const cutoff of cutoffs) {
-      const idx = raw.indexOf(cutoff);
+    for (const c of cutoffs) {
+      const idx = raw.indexOf(c);
       if (idx > 0 && idx < cutAt) cutAt = idx;
     }
     description = raw.slice(0, cutAt).trim();
   }
 
-  return { role, company, description };
+  return { role, company, location, description };
 }
 
 function scrapeIndeed() {
