@@ -58,32 +58,21 @@ function scrapeLinkedIn() {
     window.location.href.includes("/jobs/search/");
   if (isSearchResults) return scrapeLinkedInSearchResults();
 
-  // LinkedIn hashes class names — use page title for role/company, innerText for description
-  // Page title format: "Role at Company | LinkedIn" or "Role - Company | LinkedIn"
+  // LinkedIn hashes class names — use page title for role/company, innerText for location
+  // Page title format: "Role | Company | LinkedIn"
   let role = "", company = "", location = "";
-  const titleTag = document.title || "";
-  const titleBase = titleTag.replace(/\s*[\|–]\s*LinkedIn.*$/i, "").trim();
-  const atMatch = titleBase.match(/^(.+?)\s+at\s+(.+)$/i);
-  const dashMatch = titleBase.match(/^(.+?)\s+-\s+(.+)$/);
-  if (atMatch) {
-    role = atMatch[1].trim();
-    company = atMatch[2].trim();
-  } else if (dashMatch) {
-    role = dashMatch[1].trim();
-    company = dashMatch[2].trim();
-  } else {
-    role = titleBase;
-  }
+  const titleParts = (document.title || "").split(" | ").map(s => s.trim());
+  role = titleParts[0] || "";
+  company = titleParts[1] || "";
 
-  // Location: find it in body text after the role+company header
+  // Location: in body text, appears after the role as "City, ST · metadata"
   const bodyText = document.body.innerText;
   if (role) {
-    const titleIdx = bodyText.indexOf(role);
-    if (titleIdx > -1) {
-      const after = bodyText.slice(titleIdx + role.length).trim();
+    const roleIdx = bodyText.indexOf(role);
+    if (roleIdx > -1) {
+      const after = bodyText.slice(roleIdx + role.length).trim();
       const lines = after.split("\n").map(l => l.trim()).filter(l => l);
-      // Skip company line if we already have it, find location (contains city/state pattern or "Remote")
-      for (const line of lines.slice(0, 5)) {
+      for (const line of lines.slice(0, 6)) {
         if (line === company) continue;
         if (/remote|,\s*[A-Z]{2}|on-site|hybrid/i.test(line) || line.includes("·")) {
           location = line.includes("·") ? line.split("·")[0].trim() : line;
