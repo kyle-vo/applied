@@ -12,17 +12,19 @@ function scrapeLinkedInSearchResults() {
     if (jobViewLink) {
       role = jobViewLink.innerText?.trim().split("\n")[0] || "";
 
-      // Walk up to find the card container, then parse company/location from its text
+      // Walk up to find the job card container — stop at the smallest container
+      // that has more than just the title but stay under 250 chars (the full right
+      // panel is much larger and would give wrong results).
       let container = jobViewLink.parentElement;
-      for (let i = 0; i < 10; i++) {
+      for (let i = 0; i < 8; i++) {
         const text = container?.innerText?.trim() || "";
-        if (text.length > role.length + 5 && text.length < 600) {
-          const lines = text.split("\n").map(l => l.trim()).filter(l => l);
-          const titleIdx = lines.findIndex(l => l === role);
-          if (titleIdx > -1) {
-            company = lines[titleIdx + 1] || "";
-            location = lines[titleIdx + 2] || "";
-          }
+        if (text.length > role.length + 3 && text.length < 250) {
+          const lines = text.split("\n").map(l => l.trim()).filter(l => l && l !== role);
+          // Company is the first non-title, non-metadata line (short, no "·" or numbers)
+          company = lines.find(l => l.length > 1 && l.length < 60 && !l.includes("·") && !/^\d/.test(l)) || "";
+          // Location is the next line after company
+          const compIdx = lines.indexOf(company);
+          location = compIdx > -1 ? (lines[compIdx + 1] || "") : "";
           break;
         }
         container = container?.parentElement;
