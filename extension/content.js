@@ -5,40 +5,29 @@ function scrapeLinkedInSearchResults() {
   const jobIdMatch = url.match(/currentJobId=(\d+)/);
   const currentJobId = jobIdMatch?.[1];
 
-  // Try to find a link containing the job ID to get the title from its aria-label or text
+  // The /jobs/view/ link in the job card has the title as its innerText
   let role = "", company = "", location = "";
   if (currentJobId) {
-    const jobLink = document.querySelector(`a[href*="${currentJobId}"]`);
-    if (jobLink) {
-      const ariaLabel = jobLink.getAttribute("aria-label") || "";
-      // aria-label format: "Role at Company"
-      const atMatch = ariaLabel.match(/^(.+?) at (.+)$/);
-      if (atMatch) {
-        role = atMatch[1].trim();
-        company = atMatch[2].trim();
-      } else {
-        role = jobLink.innerText?.trim().split("\n")[0] || "";
+    const jobViewLink = document.querySelector(`a[href*="/jobs/view/${currentJobId}"]`);
+    if (jobViewLink) {
+      role = jobViewLink.innerText?.trim().split("\n")[0] || "";
+
+      // Walk up to find the card container, then parse company/location from its text
+      let container = jobViewLink.parentElement;
+      for (let i = 0; i < 10; i++) {
+        const text = container?.innerText?.trim() || "";
+        if (text.length > role.length + 5 && text.length < 600) {
+          const lines = text.split("\n").map(l => l.trim()).filter(l => l);
+          const titleIdx = lines.findIndex(l => l === role);
+          if (titleIdx > -1) {
+            company = lines[titleIdx + 1] || "";
+            location = lines[titleIdx + 2] || "";
+          }
+          break;
+        }
+        container = container?.parentElement;
       }
     }
-  }
-
-  // Fallback: parse the first job card from body innerText
-  if (!role) {
-    const text = document.body.innerText;
-    const lines = text.split("\n").map(l => l.trim()).filter(l => l.length > 2);
-    // Skip nav items — job cards start after filter chips
-    const startMarkers = ["Easy Apply", "Experience level", "results", "50 results"];
-    let start = 0;
-    for (const marker of startMarkers) {
-      const idx = lines.findIndex(l => l.includes(marker));
-      if (idx > -1) { start = idx + 1; break; }
-    }
-    const cardLines = lines.slice(start);
-    role = cardLines[0] || "";
-    // Company is a short line after the (possibly duplicated) title
-    const afterTitle = cardLines.findIndex((l, i) => i > 0 && l !== role && l.length > 1);
-    if (afterTitle > -1) company = cardLines[afterTitle];
-    location = cardLines[afterTitle + 1] || "";
   }
 
   // Description is not available on search results pages — right panel doesn't render in DOM
