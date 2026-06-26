@@ -41,7 +41,7 @@ function scrapeLinkedInSearchResults() {
   const aboutIdx = bodyText.lastIndexOf("About the job");
   if (aboutIdx > -1) {
     const raw = bodyText.slice(aboutIdx + "About the job".length).trim();
-    const cutoffs = ["About the company", "About the employer", "Show less", "Similar jobs", "Be an early applicant", "Job search faster with Premium"];
+    const cutoffs = ["About the company", "About the employer", "Show less", "Similar jobs", "Be an early applicant", "Job search faster with Premium", "Set alert for similar jobs", "Benefits found in job post"];
     let cutAt = raw.length;
     for (const c of cutoffs) {
       const idx = raw.indexOf(c);
@@ -58,23 +58,38 @@ function scrapeLinkedIn() {
     window.location.href.includes("/jobs/search/");
   if (isSearchResults) return scrapeLinkedInSearchResults();
 
-  // LinkedIn now uses fully hashed class names — fall back to h1 + innerText parsing
-  const role =
-    document.querySelector("h1")?.innerText?.trim() ||
-    document.querySelector(".job-details-jobs-unified-top-card__job-title h1")?.innerText?.trim() ||
-    document.querySelector(".jobs-unified-top-card__job-title h1")?.innerText?.trim();
+  // LinkedIn hashes class names — use page title for role/company, innerText for description
+  // Page title format: "Role at Company | LinkedIn" or "Role - Company | LinkedIn"
+  let role = "", company = "", location = "";
+  const titleTag = document.title || "";
+  const titleBase = titleTag.replace(/\s*[\|–]\s*LinkedIn.*$/i, "").trim();
+  const atMatch = titleBase.match(/^(.+?)\s+at\s+(.+)$/i);
+  const dashMatch = titleBase.match(/^(.+?)\s+-\s+(.+)$/);
+  if (atMatch) {
+    role = atMatch[1].trim();
+    company = atMatch[2].trim();
+  } else if (dashMatch) {
+    role = dashMatch[1].trim();
+    company = dashMatch[2].trim();
+  } else {
+    role = titleBase;
+  }
 
-  // Company and location: parse from body text relative to the title
-  let company = "", location = "";
+  // Location: find it in body text after the role+company header
   const bodyText = document.body.innerText;
   if (role) {
     const titleIdx = bodyText.indexOf(role);
     if (titleIdx > -1) {
       const after = bodyText.slice(titleIdx + role.length).trim();
       const lines = after.split("\n").map(l => l.trim()).filter(l => l);
-      company = lines[0] || "";
-      const locRaw = lines[1] || "";
-      location = locRaw.includes("·") ? locRaw.split("·")[0].trim() : locRaw;
+      // Skip company line if we already have it, find location (contains city/state pattern or "Remote")
+      for (const line of lines.slice(0, 5)) {
+        if (line === company) continue;
+        if (/remote|,\s*[A-Z]{2}|on-site|hybrid/i.test(line) || line.includes("·")) {
+          location = line.includes("·") ? line.split("·")[0].trim() : line;
+          break;
+        }
+      }
     }
   }
 
@@ -83,7 +98,8 @@ function scrapeLinkedIn() {
   const aboutIdx = bodyText.indexOf("About the job");
   if (aboutIdx > -1) {
     const raw = bodyText.slice(aboutIdx + "About the job".length).trim();
-    const cutoffs = ["Show less", "How you match", "About the company", "About the employer", "Job search faster with Premium"];
+    const cutoffs = ["Show less", "How you match", "About the company", "About the employer",
+      "Job search faster with Premium", "Set alert for similar jobs", "Benefits found in job post"];
     let cutAt = raw.length;
     for (const c of cutoffs) {
       const idx = raw.indexOf(c);
