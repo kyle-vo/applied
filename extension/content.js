@@ -41,7 +41,7 @@ function scrapeLinkedInSearchResults() {
   const aboutIdx = bodyText.lastIndexOf("About the job");
   if (aboutIdx > -1) {
     const raw = bodyText.slice(aboutIdx + "About the job".length).trim();
-    const cutoffs = ["About the company", "About the employer", "Show less", "Similar jobs", "Be an early applicant"];
+    const cutoffs = ["About the company", "About the employer", "Show less", "Similar jobs", "Be an early applicant", "Job search faster with Premium"];
     let cutAt = raw.length;
     for (const c of cutoffs) {
       const idx = raw.indexOf(c);
