@@ -1,33 +1,74 @@
+function scrapeLinkedInSearchResults() {
+  // LinkedIn search results pages use fully hashed class names and don't render
+  // the job description panel in the DOM. Parse what we can from innerText.
+  const url = window.location.href;
+  const jobIdMatch = url.match(/currentJobId=(\d+)/);
+  const currentJobId = jobIdMatch?.[1];
+
+  // Try to find a link containing the job ID to get the title from its aria-label or text
+  let role = "", company = "", location = "";
+  if (currentJobId) {
+    const jobLink = document.querySelector(`a[href*="${currentJobId}"]`);
+    if (jobLink) {
+      const ariaLabel = jobLink.getAttribute("aria-label") || "";
+      // aria-label format: "Role at Company"
+      const atMatch = ariaLabel.match(/^(.+?) at (.+)$/);
+      if (atMatch) {
+        role = atMatch[1].trim();
+        company = atMatch[2].trim();
+      } else {
+        role = jobLink.innerText?.trim().split("\n")[0] || "";
+      }
+    }
+  }
+
+  // Fallback: parse the first job card from body innerText
+  if (!role) {
+    const text = document.body.innerText;
+    const lines = text.split("\n").map(l => l.trim()).filter(l => l.length > 2);
+    // Skip nav items — job cards start after filter chips
+    const startMarkers = ["Easy Apply", "Experience level", "results", "50 results"];
+    let start = 0;
+    for (const marker of startMarkers) {
+      const idx = lines.findIndex(l => l.includes(marker));
+      if (idx > -1) { start = idx + 1; break; }
+    }
+    const cardLines = lines.slice(start);
+    role = cardLines[0] || "";
+    // Company is a short line after the (possibly duplicated) title
+    const afterTitle = cardLines.findIndex((l, i) => i > 0 && l !== role && l.length > 1);
+    if (afterTitle > -1) company = cardLines[afterTitle];
+    location = cardLines[afterTitle + 1] || "";
+  }
+
+  // Description is not available on search results pages — right panel doesn't render in DOM
+  return { role, company, location, description: "" };
+}
+
 function scrapeLinkedIn() {
+  const isSearchResults = window.location.href.includes("/jobs/search-results") ||
+    window.location.href.includes("/jobs/search/");
+  if (isSearchResults) return scrapeLinkedInSearchResults();
+
   const role =
     document.querySelector(".job-details-jobs-unified-top-card__job-title h1")?.innerText?.trim() ||
     document.querySelector(".jobs-unified-top-card__job-title h1")?.innerText?.trim() ||
     document.querySelector("h1.t-24")?.innerText?.trim() ||
-    document.querySelector("h1.jobs-unified-top-card__job-title")?.innerText?.trim() ||
-    // search results right-panel fallbacks
-    document.querySelector(".job-details-jobs-unified-top-card__job-title")?.innerText?.trim() ||
-    document.querySelector("[class*='job-details'][class*='title'] h1")?.innerText?.trim() ||
-    document.querySelector(".jobs-search__job-details h1")?.innerText?.trim();
+    document.querySelector("h1.jobs-unified-top-card__job-title")?.innerText?.trim();
 
   const company =
     document.querySelector(".job-details-jobs-unified-top-card__company-name a")?.innerText?.trim() ||
     document.querySelector(".jobs-unified-top-card__company-name a")?.innerText?.trim() ||
     document.querySelector(".job-details-jobs-unified-top-card__company-name")?.innerText?.trim() ||
-    document.querySelector(".jobs-unified-top-card__company-name")?.innerText?.trim() ||
-    // search results right-panel fallbacks
-    document.querySelector(".job-details-jobs-unified-top-card__primary-description-container a")?.innerText?.trim() ||
-    document.querySelector(".jobs-search__job-details a.app-aware-link")?.innerText?.trim();
+    document.querySelector(".jobs-unified-top-card__company-name")?.innerText?.trim();
 
   // Prefer narrow selectors that skip LinkedIn's "How you match" / profile sections
   let description =
     document.querySelector(".jobs-description__content .jobs-box__html-content")?.innerText?.trim() ||
-    document.querySelector(".jobs-description-content__text")?.innerText?.trim() ||
-    // search results right-panel fallbacks
-    document.querySelector(".jobs-description")?.innerText?.trim();
+    document.querySelector(".jobs-description-content__text")?.innerText?.trim();
 
   if (!description) {
     const raw = document.querySelector("#job-details")?.innerText?.trim() || "";
-    // Cut off at LinkedIn sections that follow the actual job description
     const cutoffs = ["Show less", "How you match", "What they're looking for", "About the company", "About the employer"];
     let cutAt = raw.length;
     for (const cutoff of cutoffs) {
