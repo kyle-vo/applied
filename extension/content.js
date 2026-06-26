@@ -35,8 +35,22 @@ function scrapeLinkedInSearchResults() {
     }
   }
 
-  // Description is not available on search results pages — right panel doesn't render in DOM
-  return { role, company, location, description: "" };
+  // Extract description from right panel via body innerText — "About the job" is the marker
+  let description = "";
+  const bodyText = document.body.innerText;
+  const aboutIdx = bodyText.lastIndexOf("About the job");
+  if (aboutIdx > -1) {
+    const raw = bodyText.slice(aboutIdx + "About the job".length).trim();
+    const cutoffs = ["About the company", "About the employer", "Show less", "Similar jobs", "Be an early applicant"];
+    let cutAt = raw.length;
+    for (const c of cutoffs) {
+      const idx = raw.indexOf(c);
+      if (idx > 0 && idx < cutAt) cutAt = idx;
+    }
+    description = raw.slice(0, cutAt).trim();
+  }
+
+  return { role, company, location, description };
 }
 
 function scrapeLinkedIn() {
