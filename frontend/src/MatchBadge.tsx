@@ -1,4 +1,8 @@
-export default function MatchBadge({ score }) {
+interface MatchBadgeProps {
+  score?: number | null;
+}
+
+export default function MatchBadge({ score }: MatchBadgeProps) {
   if (score == null) return null;
 
   const color =

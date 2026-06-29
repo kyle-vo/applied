@@ -1,25 +1,22 @@
-import React from "react";
+import React, { ReactNode, ErrorInfo } from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, useNavigate } from "react-router-dom";
 import { ClerkProvider } from "@clerk/clerk-react";
 import App from "./App";
 import "./index.css";
 
-const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined;
 
-function ClerkRouter({ children }) {
+function ClerkRouter({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   return (
-    <ClerkProvider
-      publishableKey={PUBLISHABLE_KEY}
-      navigate={(to) => navigate(to)}
-    >
+    <ClerkProvider publishableKey={PUBLISHABLE_KEY!} navigate={(to) => navigate(to)}>
       {children}
     </ClerkProvider>
   );
 }
 
-function ErrorFallback({ error }) {
+function ErrorFallback({ error }: { error: Error | null }) {
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 p-6">
       <div className="max-w-xl w-full rounded-2xl border border-red-200 bg-white p-8 shadow-sm">
@@ -33,18 +30,24 @@ function ErrorFallback({ error }) {
   );
 }
 
-class ErrorBoundary extends React.Component {
-  constructor(props) {
+interface ErrorBoundaryState { error: Error | null }
+
+class ErrorBoundary extends React.Component<{ children: ReactNode }, ErrorBoundaryState> {
+  constructor(props: { children: ReactNode }) {
     super(props);
     this.state = { error: null };
   }
 
-  static getDerivedStateFromError(error) {
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
     return { error };
   }
 
   render() {
-    return this.state.error ? <ErrorFallback error={this.state.error} /> : this.props.children;
+    return this.state.error ? (
+      <ErrorFallback error={this.state.error} />
+    ) : (
+      this.props.children
+    );
   }
 }
 
@@ -54,8 +57,8 @@ function MissingKeyFallback() {
       <div className="max-w-xl w-full rounded-2xl border border-yellow-200 bg-white p-8 shadow-sm">
         <h1 className="text-xl font-semibold text-yellow-800 mb-4">Missing Clerk configuration</h1>
         <p className="text-sm text-gray-600 mb-4">
-          The frontend needs a valid Clerk publishable key to start. Please set
-          <code className="mx-1 rounded bg-slate-100 px-1 py-0.5 text-sm">VITE_CLERK_PUBLISHABLE_KEY</code>
+          The frontend needs a valid Clerk publishable key to start. Please set{" "}
+          <code className="mx-1 rounded bg-slate-100 px-1 py-0.5 text-sm">VITE_CLERK_PUBLISHABLE_KEY</code>{" "}
           in <code className="rounded bg-slate-100 px-1 py-0.5 text-sm">frontend/.env</code>.
         </p>
         <p className="text-xs text-gray-500">If you already added it, restart the dev server.</p>
@@ -64,7 +67,7 @@ function MissingKeyFallback() {
   );
 }
 
-const root = ReactDOM.createRoot(document.getElementById("root"));
+const root = ReactDOM.createRoot(document.getElementById("root") as HTMLElement);
 
 root.render(
   <React.StrictMode>

@@ -1,69 +1,77 @@
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@clerk/clerk-react";
 import { useApi } from "./api";
+import type { Resume, ApiKey } from "./types";
 
 const BASE_URL = import.meta.env.VITE_API_URL || "/api";
 
+interface ResumesResponse { resumes: Resume[] }
+interface KeysResponse { keys: ApiKey[] }
+interface NewKeyResponse { id: number; key: string; prefix: string }
+
 export default function Settings() {
-  const [resumes, setResumes] = useState([]);
+  const [resumes, setResumes] = useState<Resume[]>([]);
   const [newName, setNewName] = useState("");
   const [newText, setNewText] = useState("");
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState(null);
-  const [savedId, setSavedId] = useState(null);
-  const fileInputRef = useRef(null);
+  const [error, setError] = useState<string | null>(null);
+  const [savedId, setSavedId] = useState<number | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const api = useApi();
   const { getToken } = useAuth();
 
-  // API key state
-  const [apiKeys, setApiKeys] = useState([]);
-  const [generatedKey, setGeneratedKey] = useState(null);
+  const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
+  const [generatedKey, setGeneratedKey] = useState<string | null>(null);
   const [keyCopied, setKeyCopied] = useState(false);
   const [generatingKey, setGeneratingKey] = useState(false);
 
   useEffect(() => {
-    api.get("/resumes").then((data) => setResumes(data.resumes)).catch(() => {});
-    api.get("/keys").then((data) => setApiKeys(data.keys)).catch(() => {});
+    api.get<ResumesResponse>("/resumes").then((data) => setResumes(data.resumes)).catch(() => {});
+    api.get<KeysResponse>("/keys").then((data) => setApiKeys(data.keys)).catch(() => {});
   }, []);
 
   async function handleGenerateKey() {
     setGeneratingKey(true);
     setGeneratedKey(null);
     try {
-      const data = await api.post("/keys", {});
+      const data = await api.post<NewKeyResponse>("/keys", {});
       setGeneratedKey(data.key);
-      setApiKeys((prev) => [{ id: data.id, prefix: data.prefix, created_at: new Date().toISOString() }, ...prev]);
+      setApiKeys((prev) => [
+        { id: data.id, prefix: data.prefix, created_at: new Date().toISOString() },
+        ...prev,
+      ]);
     } catch (err) {
-      setError(err.message);
+      setError((err as Error).message);
     } finally {
       setGeneratingKey(false);
     }
   }
 
-  async function handleRevokeKey(id) {
+  async function handleRevokeKey(id: number) {
     try {
       await api.delete(`/keys/${id}`);
       setApiKeys((prev) => prev.filter((k) => k.id !== id));
       if (generatedKey) setGeneratedKey(null);
     } catch (err) {
-      setError(err.message);
+      setError((err as Error).message);
     }
   }
 
   async function handleCopyKey() {
+    if (!generatedKey) return;
     await navigator.clipboard.writeText(generatedKey);
     setKeyCopied(true);
     setTimeout(() => setKeyCopied(false), 3000);
   }
 
-  function flashSaved(id) {
+  function flashSaved(id: number) {
     setSavedId(id);
     setTimeout(() => setSavedId(null), 3000);
   }
 
-  async function handlePdfUpload(e) {
-    const file = e.target.files[0];
+  async function handlePdfUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
     if (!file) return;
     setUploading(true);
     setError(null);
@@ -77,14 +85,14 @@ export default function Settings() {
         headers: { Authorization: `Bearer ${token}` },
         body: formData,
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Upload failed");
+      const data: Resume = await res.json();
+      if (!res.ok) throw new Error((data as unknown as { error: string }).error || "Upload failed");
       setResumes((prev) => [data, ...prev]);
       setNewName("");
       setNewText("");
       flashSaved(data.id);
     } catch (err) {
-      setError(err.message);
+      setError((err as Error).message);
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -96,7 +104,7 @@ export default function Settings() {
     setSaving(true);
     setError(null);
     try {
-      const data = await api.post("/resumes", {
+      const data = await api.post<Resume>("/resumes", {
         name: newName || "My Resume",
         resume_text: newText,
       });
@@ -105,27 +113,27 @@ export default function Settings() {
       setNewText("");
       flashSaved(data.id);
     } catch (err) {
-      setError(err.message);
+      setError((err as Error).message);
     } finally {
       setSaving(false);
     }
   }
 
-  async function handleDelete(id) {
+  async function handleDelete(id: number) {
     try {
       await api.delete(`/resumes/${id}`);
       setResumes((prev) => prev.filter((r) => r.id !== id));
     } catch (err) {
-      setError(err.message);
+      setError((err as Error).message);
     }
   }
 
-  async function handleRename(id, name) {
+  async function handleRename(id: number, name: string) {
     try {
-      const data = await api.patch(`/resumes/${id}`, { name });
+      const data = await api.patch<Resume>(`/resumes/${id}`, { name });
       setResumes((prev) => prev.map((r) => (r.id === id ? data : r)));
     } catch (err) {
-      setError(err.message);
+      setError((err as Error).message);
     }
   }
 
@@ -137,8 +145,8 @@ export default function Settings() {
       <div className="bg-white rounded-xl border border-gray-200 p-6">
         <h2 className="text-base font-medium text-gray-900 mb-1">Browser Extension</h2>
         <p className="text-sm text-gray-500 mb-4">
-          Generate an API key to connect the Applied browser extension. Paste it in the
-          extension's settings page — it never expires, so you only do this once.
+          Generate an API key to connect the Applied browser extension. Paste it in the extension's
+          settings page — it never expires, so you only do this once.
         </p>
 
         <button
@@ -172,9 +180,15 @@ export default function Settings() {
           <div className="mt-4 space-y-2">
             <p className="text-xs font-medium text-gray-500">Active keys</p>
             {apiKeys.map((k) => (
-              <div key={k.id} className="flex items-center justify-between p-2 rounded-lg border border-gray-100 bg-gray-50">
+              <div
+                key={k.id}
+                className="flex items-center justify-between p-2 rounded-lg border border-gray-100 bg-gray-50"
+              >
                 <span className="text-xs font-mono text-gray-700">
-                  {k.prefix}… <span className="text-gray-400 font-sans">created {new Date(k.created_at).toLocaleDateString()}</span>
+                  {k.prefix}…{" "}
+                  <span className="text-gray-400 font-sans">
+                    created {new Date(k.created_at).toLocaleDateString()}
+                  </span>
                 </span>
                 <button
                   onClick={() => handleRevokeKey(k.id)}
@@ -194,7 +208,10 @@ export default function Settings() {
           <h2 className="text-base font-medium text-gray-900 mb-4">Your Resumes</h2>
           <div className="space-y-3">
             {resumes.map((r) => (
-              <div key={r.id} className="flex items-center justify-between gap-3 p-3 rounded-lg border border-gray-100 bg-gray-50">
+              <div
+                key={r.id}
+                className="flex items-center justify-between gap-3 p-3 rounded-lg border border-gray-100 bg-gray-50"
+              >
                 <input
                   className="flex-1 bg-transparent text-sm font-medium text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded px-1"
                   defaultValue={r.name}
@@ -203,6 +220,16 @@ export default function Settings() {
                   }}
                 />
                 <div className="flex items-center gap-2 shrink-0">
+                  {r.s3_url && (
+                    <a
+                      href={r.s3_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs text-blue-500 hover:text-blue-700 font-medium"
+                    >
+                      Download PDF
+                    </a>
+                  )}
                   {savedId === r.id && (
                     <span className="text-xs text-green-600 font-medium">Saved!</span>
                   )}
@@ -242,7 +269,7 @@ export default function Settings() {
             onChange={handlePdfUpload}
             disabled={uploading}
           />
-          {uploading ? "Extracting text…" : "Upload PDF"}
+          {uploading ? "Uploading to S3…" : "Upload PDF"}
         </label>
 
         <textarea

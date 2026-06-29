@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useApplications } from "./useApplications";
 import { useToast } from "./Toast";
+import type { Application, AiTailor } from "./types";
 
-function ScoreBadge({ score }) {
+function ScoreBadge({ score }: { score: number }) {
   const cls =
     score >= 80
       ? "bg-green-100 text-green-700"
@@ -10,15 +11,13 @@ function ScoreBadge({ score }) {
       ? "bg-yellow-100 text-yellow-700"
       : "bg-red-100 text-red-600";
   return (
-    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${cls}`}>
-      {score}%
-    </span>
+    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${cls}`}>{score}%</span>
   );
 }
 
-function CopyButton({ text, label = "Copy" }) {
+function CopyButton({ text, label = "Copy" }: { text: string; label?: string }) {
   const [copied, setCopied] = useState(false);
-  async function handleCopy(e) {
+  async function handleCopy(e: React.MouseEvent) {
     e.stopPropagation();
     await navigator.clipboard.writeText(text);
     setCopied(true);
@@ -31,11 +30,9 @@ function CopyButton({ text, label = "Copy" }) {
   );
 }
 
-function formatAllSuggestions(tailor) {
-  const parts = [];
-  if (tailor.tailored_summary) {
-    parts.push("TAILORED SUMMARY\n" + tailor.tailored_summary);
-  }
+function formatAllSuggestions(tailor: AiTailor): string {
+  const parts: string[] = [];
+  if (tailor.tailored_summary) parts.push("TAILORED SUMMARY\n" + tailor.tailored_summary);
   if (tailor.rewrites?.length > 0) {
     parts.push(
       "SUGGESTED REWRITES\n" +
@@ -48,7 +45,17 @@ function formatAllSuggestions(tailor) {
   return parts.join("\n\n");
 }
 
-function ScoredCard({ app, analyzing, error, onAnalyze, tailoring, tailorError, onTailor }) {
+interface ScoredCardProps {
+  app: Application;
+  analyzing: boolean;
+  error?: string;
+  onAnalyze: (id: number, force: boolean) => void;
+  tailoring: boolean;
+  tailorError?: string;
+  onTailor: (id: number) => void;
+}
+
+function ScoredCard({ app, analyzing, error, onAnalyze, tailoring, tailorError, onTailor }: ScoredCardProps) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -60,7 +67,9 @@ function ScoredCard({ app, analyzing, error, onAnalyze, tailoring, tailorError, 
         <div className="flex items-center gap-3 min-w-0">
           <svg
             className={`w-4 h-4 text-gray-400 shrink-0 transition-transform ${open ? "rotate-90" : ""}`}
-            fill="none" stroke="currentColor" viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
           >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
@@ -70,7 +79,7 @@ function ScoredCard({ app, analyzing, error, onAnalyze, tailoring, tailorError, 
           </div>
         </div>
         <div className="flex items-center gap-3 shrink-0" onClick={(e) => e.stopPropagation()}>
-          <ScoreBadge score={app.ai_match_score} />
+          <ScoreBadge score={app.ai_match_score!} />
           <button
             onClick={() => onTailor(app.id)}
             disabled={tailoring}
@@ -129,12 +138,12 @@ function ScoredCard({ app, analyzing, error, onAnalyze, tailoring, tailorError, 
               <div className="flex flex-wrap gap-1.5">
                 {app.ai_analysis.keywords.map((kw, i) => {
                   const kwLower = kw.toLowerCase();
-                  const matched = app.ai_analysis.strengths?.some((s) =>
+                  const matched = app.ai_analysis!.strengths?.some((s) =>
                     s.toLowerCase().includes(kwLower)
                   );
-                  const missing = !matched && app.ai_analysis.gaps?.some((g) =>
-                    g.toLowerCase().includes(kwLower)
-                  );
+                  const missing =
+                    !matched &&
+                    app.ai_analysis!.gaps?.some((g) => g.toLowerCase().includes(kwLower));
                   return (
                     <span
                       key={i}
@@ -217,53 +226,43 @@ function ScoredCard({ app, analyzing, error, onAnalyze, tailoring, tailorError, 
 export default function Analysis() {
   const { applications, loading, analyzeApplication, tailorApplication } = useApplications();
   const { addToast } = useToast();
-  const [analyzing, setAnalyzing] = useState(new Set());
-  const [errors, setErrors] = useState({});
-  const [tailoring, setTailoring] = useState(new Set());
-  const [tailorErrors, setTailorErrors] = useState({});
+  const [analyzing, setAnalyzing] = useState<Set<number>>(new Set());
+  const [errors, setErrors] = useState<Record<number, string>>({});
+  const [tailoring, setTailoring] = useState<Set<number>>(new Set());
+  const [tailorErrors, setTailorErrors] = useState<Record<number, string>>({});
 
   const scored = applications.filter((a) => a.ai_match_score != null);
   const unscored = applications.filter((a) => a.ai_match_score == null && a.job_description);
   const noJd = applications.filter((a) => !a.job_description);
 
-  async function handleAnalyze(id, force = false) {
+  async function handleAnalyze(id: number, force = false) {
     setErrors((prev) => { const e = { ...prev }; delete e[id]; return e; });
     setAnalyzing((prev) => new Set([...prev, id]));
     try {
       await analyzeApplication(id, { force });
       addToast("Analysis complete");
     } catch (err) {
-      setErrors((prev) => ({ ...prev, [id]: err.message }));
+      setErrors((prev) => ({ ...prev, [id]: (err as Error).message }));
     } finally {
-      setAnalyzing((prev) => {
-        const next = new Set(prev);
-        next.delete(id);
-        return next;
-      });
+      setAnalyzing((prev) => { const next = new Set(prev); next.delete(id); return next; });
     }
   }
 
-  async function handleTailor(id) {
+  async function handleTailor(id: number) {
     setTailorErrors((prev) => { const e = { ...prev }; delete e[id]; return e; });
     setTailoring((prev) => new Set([...prev, id]));
     try {
       await tailorApplication(id);
       addToast("Tailoring suggestions ready");
     } catch (err) {
-      setTailorErrors((prev) => ({ ...prev, [id]: err.message }));
+      setTailorErrors((prev) => ({ ...prev, [id]: (err as Error).message }));
     } finally {
-      setTailoring((prev) => {
-        const next = new Set(prev);
-        next.delete(id);
-        return next;
-      });
+      setTailoring((prev) => { const next = new Set(prev); next.delete(id); return next; });
     }
   }
 
   if (loading)
-    return (
-      <div className="flex items-center justify-center h-64 text-gray-400 text-sm">Loading…</div>
-    );
+    return <div className="flex items-center justify-center h-64 text-gray-400 text-sm">Loading…</div>;
 
   const hasAnything = scored.length > 0 || unscored.length > 0;
 
@@ -275,7 +274,7 @@ export default function Analysis() {
           <span className="text-sm text-gray-500">
             {scored.length} scored · avg{" "}
             <span className="font-medium text-gray-700">
-              {Math.round(scored.reduce((s, a) => s + a.ai_match_score, 0) / scored.length)}%
+              {Math.round(scored.reduce((s, a) => s + (a.ai_match_score ?? 0), 0) / scored.length)}%
             </span>
           </span>
         )}
@@ -285,8 +284,8 @@ export default function Analysis() {
         <div className="card p-12 text-center space-y-2">
           <p className="text-gray-500 text-sm">No applications with job descriptions yet.</p>
           <p className="text-gray-400 text-xs">
-            Paste a job description when adding an application — then run AI analysis to get a
-            match score and gap breakdown.
+            Paste a job description when adding an application — then run AI analysis to get a match
+            score and gap breakdown.
           </p>
         </div>
       )}
@@ -299,9 +298,7 @@ export default function Analysis() {
               <div className="min-w-0">
                 <p className="font-medium text-gray-900 truncate">{app.company}</p>
                 <p className="text-sm text-gray-500 truncate">{app.role}</p>
-                {errors[app.id] && (
-                  <p className="text-xs text-red-500 mt-1">{errors[app.id]}</p>
-                )}
+                {errors[app.id] && <p className="text-xs text-red-500 mt-1">{errors[app.id]}</p>}
               </div>
               <button
                 onClick={() => handleAnalyze(app.id)}
@@ -318,8 +315,8 @@ export default function Analysis() {
       {scored.length > 0 && (
         <div className="space-y-2">
           <p className="text-sm font-medium text-gray-700">Results</p>
-          {scored
-            .sort((a, b) => b.ai_match_score - a.ai_match_score)
+          {[...scored]
+            .sort((a, b) => (b.ai_match_score ?? 0) - (a.ai_match_score ?? 0))
             .map((app) => (
               <ScoredCard
                 key={app.id}
@@ -337,8 +334,8 @@ export default function Analysis() {
 
       {noJd.length > 0 && (
         <p className="text-xs text-gray-400 text-center">
-          {noJd.length} application{noJd.length > 1 ? "s" : ""} without a job description —
-          add one to enable analysis.
+          {noJd.length} application{noJd.length > 1 ? "s" : ""} without a job description — add one
+          to enable analysis.
         </p>
       )}
     </div>

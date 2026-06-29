@@ -3,8 +3,15 @@ import { useApplications } from "./useApplications";
 import KanbanBoard from "./KanbanBoard";
 import JobModal from "./JobModal";
 import { useToast } from "./Toast";
+import type { Application, ApplicationForm } from "./types";
 
-function StatCard({ label, value, sub }) {
+interface StatCardProps {
+  label: string;
+  value: string | number | null | undefined;
+  sub?: string;
+}
+
+function StatCard({ label, value, sub }: StatCardProps) {
   return (
     <div className="card p-5">
       <p className="text-sm text-gray-500 mb-1">{label}</p>
@@ -15,12 +22,13 @@ function StatCard({ label, value, sub }) {
 }
 
 export default function Dashboard() {
-  const { applications, summary, loading, error, createApplication, updateApplication, updateStatus } = useApplications();
+  const { applications, summary, loading, error, createApplication, updateApplication, updateStatus } =
+    useApplications();
   const { addToast } = useToast();
   const [modalOpen, setModalOpen] = useState(false);
-  const [editing, setEditing] = useState(null);
+  const [editing, setEditing] = useState<Application | null>(null);
 
-  async function handleSave(body, opts) {
+  async function handleSave(body: ApplicationForm, opts: { force: boolean }) {
     if (editing) {
       await updateApplication(editing.id, body);
       addToast("Application updated");
@@ -30,20 +38,15 @@ export default function Dashboard() {
     }
   }
 
-  if (loading) return (
-    <div className="flex items-center justify-center h-64 text-gray-400 text-sm">Loading…</div>
-  );
-  if (error) return (
-    <div className="text-red-500 text-sm p-4">{error}</div>
-  );
+  if (loading)
+    return <div className="flex items-center justify-center h-64 text-gray-400 text-sm">Loading…</div>;
+  if (error)
+    return <div className="text-red-500 text-sm p-4">{error}</div>;
 
-  const pipelineApps = applications.filter(
-    (a) => !["rejected", "withdrawn"].includes(a.status)
-  );
+  const pipelineApps = applications.filter((a) => !["rejected", "withdrawn"].includes(a.status));
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-gray-900">Dashboard</h1>
         <button
@@ -54,7 +57,6 @@ export default function Dashboard() {
         </button>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
         <StatCard
           label="Total applied"
@@ -73,7 +75,6 @@ export default function Dashboard() {
         />
       </div>
 
-      {/* Kanban */}
       <div>
         <h2 className="text-sm font-semibold text-gray-700 mb-4">Pipeline</h2>
         {pipelineApps.length === 0 ? (

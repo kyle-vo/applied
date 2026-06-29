@@ -1,15 +1,22 @@
-import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
+import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import MatchBadge from "./MatchBadge";
 import { formatDistanceToNow } from "date-fns";
+import type { Application } from "./types";
 
 const COLUMNS = [
-  { id: "applied",    label: "Applied" },
-  { id: "screening",  label: "Screening" },
-  { id: "interview",  label: "Interview" },
-  { id: "offer",      label: "Offer" },
+  { id: "applied", label: "Applied" },
+  { id: "screening", label: "Screening" },
+  { id: "interview", label: "Interview" },
+  { id: "offer", label: "Offer" },
 ];
 
-function JobCard({ app, index, onClick }) {
+interface JobCardProps {
+  app: Application;
+  index: number;
+  onClick: (app: Application) => void;
+}
+
+function JobCard({ app, index, onClick }: JobCardProps) {
   return (
     <Draggable draggableId={String(app.id)} index={index}>
       {(provided, snapshot) => (
@@ -36,18 +43,21 @@ function JobCard({ app, index, onClick }) {
   );
 }
 
-export default function KanbanBoard({ applications, onStatusChange, onCardClick }) {
-  function handleDragEnd(result) {
+interface KanbanBoardProps {
+  applications: Application[];
+  onStatusChange: (id: number, status: string) => void;
+  onCardClick: (app: Application) => void;
+}
+
+export default function KanbanBoard({ applications, onStatusChange, onCardClick }: KanbanBoardProps) {
+  function handleDragEnd(result: DropResult) {
     const { destination, source, draggableId } = result;
     if (!destination) return;
     if (destination.droppableId === source.droppableId) return;
-
-    const appId = parseInt(draggableId);
-    onStatusChange(appId, destination.droppableId);
+    onStatusChange(parseInt(draggableId), destination.droppableId);
   }
 
-  const byStatus = (status) =>
-    applications.filter((a) => a.status === status);
+  const byStatus = (status: string) => applications.filter((a) => a.status === status);
 
   return (
     <DragDropContext onDragEnd={handleDragEnd}>
@@ -70,16 +80,13 @@ export default function KanbanBoard({ applications, onStatusChange, onCardClick 
                     ref={provided.innerRef}
                     {...provided.droppableProps}
                     className={`flex-1 min-h-[120px] rounded-xl p-2 transition-colors ${
-                      snapshot.isDraggingOver ? "bg-brand-50 border-2 border-dashed border-brand-300" : "bg-gray-50"
+                      snapshot.isDraggingOver
+                        ? "bg-brand-50 border-2 border-dashed border-brand-300"
+                        : "bg-gray-50"
                     }`}
                   >
                     {cards.map((app, index) => (
-                      <JobCard
-                        key={app.id}
-                        app={app}
-                        index={index}
-                        onClick={onCardClick}
-                      />
+                      <JobCard key={app.id} app={app} index={index} onClick={onCardClick} />
                     ))}
                     {provided.placeholder}
                   </div>

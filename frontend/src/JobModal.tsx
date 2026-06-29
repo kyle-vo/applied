@@ -1,8 +1,11 @@
 import { useState, useEffect } from "react";
+import type { Application, ApplicationForm, ApplicationStatus } from "./types";
 
-const STATUSES = ["applied", "screening", "interview", "offer", "rejected", "withdrawn"];
+const STATUSES: ApplicationStatus[] = [
+  "applied", "screening", "interview", "offer", "rejected", "withdrawn",
+];
 
-const EMPTY = {
+const EMPTY: ApplicationForm = {
   company: "",
   role: "",
   location: "",
@@ -13,32 +16,41 @@ const EMPTY = {
   follow_up_at: "",
 };
 
-export default function JobModal({ open, onClose, onSave, initial }) {
-  const [form, setForm] = useState(EMPTY);
+interface JobModalProps {
+  open: boolean;
+  onClose: () => void;
+  onSave: (body: ApplicationForm, opts: { force: boolean }) => Promise<void>;
+  initial?: Application | null;
+}
+
+export default function JobModal({ open, onClose, onSave, initial }: JobModalProps) {
+  const [form, setForm] = useState<ApplicationForm>(EMPTY);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState(null);
-  const [duplicateOf, setDuplicateOf] = useState(null);
+  const [error, setError] = useState<string | null>(null);
+  const [duplicateOf, setDuplicateOf] = useState<Application | null>(null);
 
   useEffect(() => {
     if (open) {
       setDuplicateOf(null);
-      setForm(initial ? {
-        company: initial.company ?? "",
-        role: initial.role ?? "",
-        location: initial.location ?? "",
-        job_url: initial.job_url ?? "",
-        job_description: initial.job_description ?? "",
-        status: initial.status ?? "applied",
-        notes: initial.notes ?? "",
-        follow_up_at: initial.follow_up_at
-          ? initial.follow_up_at.slice(0, 10)
-          : "",
-      } : EMPTY);
+      setForm(
+        initial
+          ? {
+              company: initial.company ?? "",
+              role: initial.role ?? "",
+              location: initial.location ?? "",
+              job_url: initial.job_url ?? "",
+              job_description: initial.job_description ?? "",
+              status: initial.status ?? "applied",
+              notes: initial.notes ?? "",
+              follow_up_at: initial.follow_up_at ? initial.follow_up_at.slice(0, 10) : "",
+            }
+          : EMPTY
+      );
       setError(null);
     }
   }, [open, initial]);
 
-  function set(field, value) {
+  function set<K extends keyof ApplicationForm>(field: K, value: ApplicationForm[K]) {
     setForm((f) => ({ ...f, [field]: value }));
   }
 
@@ -51,13 +63,14 @@ export default function JobModal({ open, onClose, onSave, initial }) {
     setError(null);
     setDuplicateOf(null);
     try {
-      await onSave({ ...form, follow_up_at: form.follow_up_at || null }, { force });
+      await onSave({ ...form, follow_up_at: form.follow_up_at || "" }, { force });
       onClose();
     } catch (err) {
-      if (err.duplicate) {
-        setDuplicateOf(err.duplicate);
+      const apiErr = err as import("./types").ApiError;
+      if (apiErr.duplicate) {
+        setDuplicateOf(apiErr.duplicate);
       } else {
-        setError(err.message);
+        setError(apiErr.message);
       }
     } finally {
       setSaving(false);
@@ -74,7 +87,9 @@ export default function JobModal({ open, onClose, onSave, initial }) {
           <h2 className="font-semibold text-gray-900">
             {initial ? "Edit application" : "Add application"}
           </h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">
+            ×
+          </button>
         </div>
 
         <div className="p-5 space-y-4">
@@ -88,7 +103,8 @@ export default function JobModal({ open, onClose, onSave, initial }) {
             <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5">
               <p className="text-sm font-medium text-amber-800">Possible duplicate</p>
               <p className="text-xs text-amber-700 mt-0.5">
-                You already have a <strong>{duplicateOf.role}</strong> application at <strong>{duplicateOf.company}</strong> (status: {duplicateOf.status}).
+                You already have a <strong>{duplicateOf.role}</strong> application at{" "}
+                <strong>{duplicateOf.company}</strong> (status: {duplicateOf.status}).
               </p>
               <div className="flex gap-2 mt-2.5">
                 <button
@@ -111,24 +127,45 @@ export default function JobModal({ open, onClose, onSave, initial }) {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="label">Company *</label>
-              <input className="input" value={form.company} onChange={e => set("company", e.target.value)} placeholder="Stripe" />
+              <input
+                className="input"
+                value={form.company}
+                onChange={(e) => set("company", e.target.value)}
+                placeholder="Stripe"
+              />
             </div>
             <div>
               <label className="label">Role *</label>
-              <input className="input" value={form.role} onChange={e => set("role", e.target.value)} placeholder="Software Engineer" />
+              <input
+                className="input"
+                value={form.role}
+                onChange={(e) => set("role", e.target.value)}
+                placeholder="Software Engineer"
+              />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="label">Location</label>
-              <input className="input" value={form.location} onChange={e => set("location", e.target.value)} placeholder="San Francisco, CA" />
+              <input
+                className="input"
+                value={form.location}
+                onChange={(e) => set("location", e.target.value)}
+                placeholder="San Francisco, CA"
+              />
             </div>
             <div>
               <label className="label">Status</label>
-              <select className="input" value={form.status} onChange={e => set("status", e.target.value)}>
-                {STATUSES.map(s => (
-                  <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+              <select
+                className="input"
+                value={form.status}
+                onChange={(e) => set("status", e.target.value as ApplicationStatus)}
+              >
+                {STATUSES.map((s) => (
+                  <option key={s} value={s}>
+                    {s.charAt(0).toUpperCase() + s.slice(1)}
+                  </option>
                 ))}
               </select>
             </div>
@@ -136,7 +173,12 @@ export default function JobModal({ open, onClose, onSave, initial }) {
 
           <div>
             <label className="label">Job URL</label>
-            <input className="input" value={form.job_url} onChange={e => set("job_url", e.target.value)} placeholder="https://jobs.stripe.com/..." />
+            <input
+              className="input"
+              value={form.job_url}
+              onChange={(e) => set("job_url", e.target.value)}
+              placeholder="https://jobs.stripe.com/..."
+            />
           </div>
 
           <div>
@@ -145,25 +187,38 @@ export default function JobModal({ open, onClose, onSave, initial }) {
               className="input resize-none"
               rows={5}
               value={form.job_description}
-              onChange={e => set("job_description", e.target.value)}
+              onChange={(e) => set("job_description", e.target.value)}
               placeholder="Paste the full job description here — used for AI match scoring"
             />
           </div>
 
           <div>
             <label className="label">Follow-up date</label>
-            <input className="input" type="date" value={form.follow_up_at} onChange={e => set("follow_up_at", e.target.value)} />
+            <input
+              className="input"
+              type="date"
+              value={form.follow_up_at}
+              onChange={(e) => set("follow_up_at", e.target.value)}
+            />
           </div>
 
           <div>
             <label className="label">Notes</label>
-            <textarea className="input resize-none" rows={3} value={form.notes} onChange={e => set("notes", e.target.value)} placeholder="Referral from John, recruiter name, etc." />
+            <textarea
+              className="input resize-none"
+              rows={3}
+              value={form.notes}
+              onChange={(e) => set("notes", e.target.value)}
+              placeholder="Referral from John, recruiter name, etc."
+            />
           </div>
         </div>
 
         <div className="flex justify-end gap-2 p-5 border-t border-gray-100">
-          <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+          <button className="btn btn-secondary" onClick={onClose}>
+            Cancel
+          </button>
+          <button className="btn btn-primary" onClick={() => handleSave()} disabled={saving}>
             {saving ? "Saving…" : initial ? "Save changes" : "Add application"}
           </button>
         </div>
