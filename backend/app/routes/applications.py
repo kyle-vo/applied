@@ -1,9 +1,13 @@
-import json
+import hashlib
 from flask import Blueprint, request, jsonify, g
-from app import db, redis_client
+from app import db
 from app.models.application import Application, ApplicationStatus
 from app.middleware.auth import require_auth
 from datetime import datetime
+
+
+def _content_hash(resume_text: str, job_description: str) -> str:
+    return hashlib.sha256((resume_text + job_description).encode()).hexdigest()
 
 applications_bp = Blueprint("applications", __name__)
 
@@ -182,16 +186,6 @@ def analyze_application(app_id):
     if not app_entry.job_description:
         return jsonify({"error": "No job description — add one before analyzing"}), 400
 
-    cache_key = f"analysis:{app_id}"
-    force = request.args.get("force") == "true"
-    try:
-        if not force:
-            cached = redis_client.get(cache_key)
-            if cached:
-                return jsonify(json.loads(cached))
-    except Exception:
-        pass
-
     from app.models.resume import Resume
     data = request.get_json(silent=True) or {}
     resume_id = data.get("resume_id")
@@ -201,6 +195,12 @@ def analyze_application(app_id):
         resume = Resume.query.filter_by(user_id=g.user_id).order_by(Resume.created_at.desc()).first()
     if not resume:
         return jsonify({"error": "No resume found — upload a resume in Settings first"}), 400
+
+    force = request.args.get("force") == "true"
+    content_hash = _content_hash(resume.resume_text, app_entry.job_description)
+
+    if not force and app_entry.ai_match_score is not None and app_entry.analysis_hash == content_hash:
+        return jsonify(app_entry.to_dict())
 
     from app.services.ai import analyze_match
     try:
@@ -214,15 +214,10 @@ def analyze_application(app_id):
         "gaps": result.get("gaps", []),
         "keywords": result.get("keywords", []),
     }
+    app_entry.analysis_hash = content_hash
     db.session.commit()
 
-    response_data = app_entry.to_dict()
-    try:
-        redis_client.setex(cache_key, 3600, json.dumps(response_data))
-    except Exception:
-        pass
-
-    return jsonify(response_data)
+    return jsonify(app_entry.to_dict())
 
 
 # ── POST /api/applications/<id>/tailor ────────────────────────────────────────
@@ -236,10 +231,6 @@ def tailor_application(app_id):
     if not app_entry.job_description:
         return jsonify({"error": "No job description — add one before tailoring"}), 400
 
-    force = request.args.get("force") == "true"
-    if not force and app_entry.ai_tailor:
-        return jsonify(app_entry.to_dict())
-
     from app.models.resume import Resume
     data = request.get_json(silent=True) or {}
     resume_id = data.get("resume_id")
@@ -250,6 +241,12 @@ def tailor_application(app_id):
     if not resume:
         return jsonify({"error": "No resume found — upload a resume in Settings first"}), 400
 
+    force = request.args.get("force") == "true"
+    content_hash = _content_hash(resume.resume_text, app_entry.job_description)
+
+    if not force and app_entry.ai_tailor is not None and app_entry.tailor_hash == content_hash:
+        return jsonify(app_entry.to_dict())
+
     from app.services.ai import tailor_resume
     try:
         result = tailor_resume(app_entry.job_description, resume.resume_text)
@@ -257,6 +254,7 @@ def tailor_application(app_id):
         return jsonify({"error": f"AI tailoring failed: {str(e)}"}), 502
 
     app_entry.ai_tailor = result
+    app_entry.tailor_hash = content_hash
     db.session.commit()
 
     return jsonify(app_entry.to_dict())

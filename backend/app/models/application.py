@@ -36,6 +36,8 @@ class Application(db.Model):
     ai_match_score = db.Column(db.Integer)       # 0-100
     ai_analysis = db.Column(db.JSON)             # {strengths: [], gaps: [], keywords: []}
     ai_tailor = db.Column(db.JSON)               # {tailored_summary, rewrites[], keywords_to_add[]}
+    analysis_hash = db.Column(db.String(64))     # sha256(resume_text + job_description)
+    tailor_hash = db.Column(db.String(64))       # sha256(resume_text + job_description)
 
     # Dates
     applied_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
