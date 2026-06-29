@@ -226,14 +226,10 @@ async function scrapeHandshake() {
     const rightContent = document.querySelector("[data-hook='right-content']");
     role = rightContent?.querySelector("h1")?.innerText?.trim();
 
-    // Company sits near the role in right-content — find it relative to role's position
+    // Company is always the first line of right-content; role appears after a category line
     const contentLines = rightContent?.innerText?.trim().split("\n").map(l => l.trim()).filter(Boolean) || [];
-    const roleIdx = contentLines.findIndex(l => l === role);
-    if (roleIdx > 0) {
-      company = contentLines[roleIdx - 1];
-    } else if (roleIdx === 0 && contentLines.length > 1) {
-      company = contentLines[1];
-    }
+    company = contentLines[0] || "";
+    if (company === role) company = contentLines[1] || "";
 
     // If the right panel h1 isn't found yet, fall back to title if it has job info
     if (!role && titleParts.length >= 3) {
