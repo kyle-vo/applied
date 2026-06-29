@@ -210,29 +210,35 @@ function scrapeSimplify() {
 async function scrapeHandshake() {
   const url = window.location.href;
   const titleParts = document.title.split(" | ");
-  // Full job page: title is "Role | Company | Handshake" (3 parts)
-  // Search page:   title is "Jobs | Handshake" (2 parts — no job info in title)
-  const titleHasJobInfo = titleParts.length >= 3;
+
+  // Use URL to determine page type — title is unreliable because it updates to
+  // "Role | Company | Handshake" when a job is selected in search results, but
+  // the DOM still has the search-page structure (no job-details-page hook).
+  const isFullJobPage = /\/(jobs|postings)\/\d+/.test(new URL(url).pathname);
 
   let role, company;
 
-  if (titleHasJobInfo) {
+  if (isFullJobPage) {
     role = titleParts[0]?.trim();
     company = titleParts[1]?.trim();
   } else {
-    // Search page: the right panel has data-hook="right-content"
-    // First line of right-content is the company name; h1 inside it is the job title
+    // Search page with job selected in the right panel
     const rightContent = document.querySelector("[data-hook='right-content']");
     role = rightContent?.querySelector("h1")?.innerText?.trim();
-    company = rightContent?.innerText?.trim().split("\n")[0]?.trim();
 
-    // Fallback: pull from the selected job card using the job ID in the URL
-    if (!company) {
-      const jobIdMatch = url.match(/\/job-search\/(\d+)/);
-      if (jobIdMatch) {
-        const card = document.querySelector(`[data-hook='job-result-card | ${jobIdMatch[1]}']`);
-        company = card?.innerText?.trim().split("\n")[0]?.trim();
-      }
+    // Company sits near the role in right-content — find it relative to role's position
+    const contentLines = rightContent?.innerText?.trim().split("\n").map(l => l.trim()).filter(Boolean) || [];
+    const roleIdx = contentLines.findIndex(l => l === role);
+    if (roleIdx > 0) {
+      company = contentLines[roleIdx - 1];
+    } else if (roleIdx === 0 && contentLines.length > 1) {
+      company = contentLines[1];
+    }
+
+    // If the right panel h1 isn't found yet, fall back to title if it has job info
+    if (!role && titleParts.length >= 3) {
+      role = titleParts[0]?.trim();
+      company = titleParts[1]?.trim();
     }
   }
 
@@ -299,17 +305,21 @@ async function scrape() {
 }
 
 async function scrapeWithRetry() {
-  // Search results pages render the job panel async — wait longer before first scrape
-  const isSearchResults = window.location.href.includes("/jobs/search-results") ||
-    window.location.href.includes("/jobs/search/");
-  if (isSearchResults) {
-    await new Promise((r) => setTimeout(r, 1200));
+  const url = window.location.href;
+  const isLinkedInSearch = url.includes("/jobs/search-results") || url.includes("/jobs/search/");
+  const isHandshakeSearch = url.includes("joinhandshake.com") && !/\/(jobs|postings)\/\d+/.test(new URL(url).pathname);
+  const isSearchPage = isLinkedInSearch || isHandshakeSearch;
+
+  // Search pages render the job panel async — wait before first scrape
+  if (isSearchPage) {
+    await new Promise((r) => setTimeout(r, 1500));
   }
 
   const result = await scrape();
-  // Retry once more if still empty (panel may still be loading)
-  if (!result.role && !result.company) {
-    await new Promise((r) => setTimeout(r, 1000));
+  // Retry if role/company are missing, OR if on a search page where the description
+  // panel can load slower than the job card metadata
+  if ((!result.role && !result.company) || (isSearchPage && !result.description)) {
+    await new Promise((r) => setTimeout(r, 1500));
     return scrape();
   }
   return result;
