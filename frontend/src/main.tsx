@@ -10,7 +10,12 @@ const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | u
 function ClerkRouter({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   return (
-    <ClerkProvider publishableKey={PUBLISHABLE_KEY!} navigate={(to) => navigate(to)}>
+    <ClerkProvider
+      publishableKey={PUBLISHABLE_KEY!}
+      navigate={(to) => navigate(to)}
+      signInUrl="/sign-in"
+      signUpUrl="/sign-up"
+    >
       {children}
     </ClerkProvider>
   );
