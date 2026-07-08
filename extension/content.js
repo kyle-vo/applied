@@ -1,4 +1,19 @@
-function scrapeLinkedInSearchResults() {
+async function expandLinkedInDescription() {
+  // The right-panel description is truncated behind a "…more" button — expand
+  // it before scraping so we get the full text instead of the preview.
+  const btn = [...document.querySelectorAll("button")].find((b) => {
+    if (b.closest("footer, nav")) return false; // global "More" menu, not the description
+    const label = (b.getAttribute("aria-label") || "").toLowerCase();
+    const text = (b.innerText || "").trim().toLowerCase();
+    return label.includes("see more") || /^(…|\.{3})?\s*more$/.test(text);
+  });
+  if (btn) {
+    btn.click();
+    await new Promise((r) => setTimeout(r, 500));
+  }
+}
+
+async function scrapeLinkedInSearchResults() {
   // LinkedIn search results pages use fully hashed class names and don't render
   // the job description panel in the DOM. Parse what we can from innerText.
   const url = window.location.href;
@@ -22,11 +37,19 @@ function scrapeLinkedInSearchResults() {
           const lines = text.split("\n").map(l => l.trim()).filter(l => l);
           const titleIdx = lines.findIndex(l => l === role);
           if (titleIdx > -1) {
-            // Company appears before the title in LinkedIn's card structure
+            // Older card layout puts the company on the line before the title
             company = lines[titleIdx - 1] || "";
-            // Location line contains "· N hours ago · ..." — strip the metadata after first "·"
+            // The line after the title is either "City, ST · metadata" or the
+            // combined "Company • City, ST (On-site)" form — split on both
+            // separator characters and assign the pieces accordingly.
             const locRaw = lines[titleIdx + 1] || "";
-            location = locRaw.includes("·") ? locRaw.split("·")[0].trim() : locRaw;
+            const parts = locRaw.split(/\s*[·•]\s*/).map(p => p.trim()).filter(Boolean);
+            if (!company && parts.length >= 2) {
+              company = parts[0];
+              location = parts[1];
+            } else {
+              location = parts[0] || "";
+            }
           }
           break;
         }
@@ -36,6 +59,7 @@ function scrapeLinkedInSearchResults() {
   }
 
   // Extract description from right panel via body innerText — "About the job" is the marker
+  await expandLinkedInDescription();
   let description = "";
   const bodyText = document.body.innerText;
   const aboutIdx = bodyText.lastIndexOf("About the job");
@@ -53,10 +77,12 @@ function scrapeLinkedInSearchResults() {
   return { role, company, location, description };
 }
 
-function scrapeLinkedIn() {
+async function scrapeLinkedIn() {
   const isSearchResults = window.location.href.includes("/jobs/search-results") ||
     window.location.href.includes("/jobs/search/");
   if (isSearchResults) return scrapeLinkedInSearchResults();
+
+  await expandLinkedInDescription();
 
   // LinkedIn hashes class names — use page title for role/company, innerText for location
   // Page title format: "Role | Company | LinkedIn"
@@ -74,8 +100,8 @@ function scrapeLinkedIn() {
       const lines = after.split("\n").map(l => l.trim()).filter(l => l);
       for (const line of lines.slice(0, 6)) {
         if (line === company) continue;
-        if (/remote|,\s*[A-Z]{2}|on-site|hybrid/i.test(line) || line.includes("·")) {
-          location = line.includes("·") ? line.split("·")[0].trim() : line;
+        if (/remote|,\s*[A-Z]{2}|on-site|hybrid/i.test(line) || /[·•]/.test(line)) {
+          location = line.split(/[·•]/)[0].trim();
           break;
         }
       }
@@ -313,7 +339,7 @@ async function scrape() {
   let data = { role: "", company: "", description: "", url };
 
   if (url.includes("linkedin.com")) {
-    Object.assign(data, scrapeLinkedIn());
+    Object.assign(data, await scrapeLinkedIn());
   } else if (url.includes("indeed.com")) {
     Object.assign(data, scrapeIndeed());
   } else if (url.includes("greenhouse.io")) {
