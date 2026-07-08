@@ -1,5 +1,6 @@
 import { NavLink } from "react-router-dom";
 import { UserButton } from "@clerk/clerk-react";
+import { exitDemo, isDemoMode } from "./demo";
 
 const links = [
   { to: "/dashboard", label: "Dashboard" },
@@ -33,7 +34,19 @@ export default function Navbar() {
             ))}
           </div>
         </div>
-        <UserButton afterSignOutUrl="/" />
+        {isDemoMode() ? (
+          <button
+            onClick={() => {
+              exitDemo();
+              window.location.href = "/sign-in";
+            }}
+            className="px-3 py-1.5 rounded-lg text-sm font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 transition-colors"
+          >
+            Exit demo
+          </button>
+        ) : (
+          <UserButton afterSignOutUrl="/" />
+        )}
       </div>
     </nav>
   );

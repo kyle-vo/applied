@@ -55,6 +55,7 @@ All endpoints require either `Authorization: Bearer <clerk_token>` or `X-API-Key
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | /health | Health check (no auth) |
+| POST | /api/demo/start | Create isolated demo account with seeded data, returns API key (no auth) |
 | GET | /api/applications | List all + summary stats |
 | POST | /api/applications | Create application |
 | GET | /api/applications/:id | Get single |
@@ -139,6 +140,7 @@ cd frontend && npm test
 - [x] Deployed on Railway (frontend + backend + Postgres + Redis)
 - [x] UTC timestamp fix (applied_at displays correctly in local time)
 - [x] Test suites (pytest + Vitest) with GitHub Actions CI
+- [x] Demo mode — "Try the demo" on sign-in page creates isolated 24h account with seeded data; AI calls return canned results (`app/services/demo.py`), lazy cleanup on each demo start
 
 ## Kyle's goals
 1. **Deploy to Railway** — ✅ live

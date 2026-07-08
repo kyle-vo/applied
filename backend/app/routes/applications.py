@@ -202,11 +202,16 @@ def analyze_application(app_id):
     if not force and app_entry.ai_match_score is not None and app_entry.analysis_hash == content_hash:
         return jsonify(app_entry.to_dict())
 
-    from app.services.ai import analyze_match
-    try:
-        result = analyze_match(app_entry.job_description, resume.resume_text)
-    except Exception as e:
-        return jsonify({"error": f"AI analysis failed: {str(e)}"}), 502
+    # Demo accounts get canned results so demo traffic never spends AI credits
+    from app.services.demo import is_demo_user, canned_analysis
+    if is_demo_user(g.user_id):
+        result = canned_analysis(app_entry.job_description, resume.resume_text)
+    else:
+        from app.services.ai import analyze_match
+        try:
+            result = analyze_match(app_entry.job_description, resume.resume_text)
+        except Exception as e:
+            return jsonify({"error": f"AI analysis failed: {str(e)}"}), 502
 
     app_entry.ai_match_score = result["score"]
     app_entry.ai_analysis = {
@@ -247,11 +252,15 @@ def tailor_application(app_id):
     if not force and app_entry.ai_tailor is not None and app_entry.tailor_hash == content_hash:
         return jsonify(app_entry.to_dict())
 
-    from app.services.ai import tailor_resume
-    try:
-        result = tailor_resume(app_entry.job_description, resume.resume_text)
-    except Exception as e:
-        return jsonify({"error": f"AI tailoring failed: {str(e)}"}), 502
+    from app.services.demo import is_demo_user, canned_tailor
+    if is_demo_user(g.user_id):
+        result = canned_tailor(app_entry.job_description, resume.resume_text)
+    else:
+        from app.services.ai import tailor_resume
+        try:
+            result = tailor_resume(app_entry.job_description, resume.resume_text)
+        except Exception as e:
+            return jsonify({"error": f"AI tailoring failed: {str(e)}"}), 502
 
     app_entry.ai_tailor = result
     app_entry.tailor_hash = content_hash
