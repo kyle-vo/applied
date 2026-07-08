@@ -113,6 +113,18 @@ cd backend && flask db upgrade
 cd applied/frontend && npm install && npm run dev
 ```
 
+## Testing
+```bash
+# Backend — pytest (44 tests, in-memory SQLite, Claude mocked, real X-API-Key auth path)
+cd backend && .venv/Scripts/python -m pytest
+
+# Frontend — Vitest + React Testing Library (13 tests)
+cd frontend && npm test
+```
+- Backend tests live in `backend/tests/` — auth, applications CRUD + summary stats, analyze (dedup/force/502), API keys, resumes, user isolation
+- Frontend tests: `src/MatchBadge.test.tsx`, `src/useApplications.test.ts` (useApi mocked)
+- CI: `.github/workflows/ci.yml` runs both suites + frontend build on every push/PR
+
 ## What's done
 - [x] Docker Compose setup (Postgres + Redis + Flask)
 - [x] Clerk JWT auth + long-lived API key auth for extension
@@ -126,6 +138,7 @@ cd applied/frontend && npm install && npm run dev
 - [x] Settings page — resume management + API key generate/revoke
 - [x] Deployed on Railway (frontend + backend + Postgres + Redis)
 - [x] UTC timestamp fix (applied_at displays correctly in local time)
+- [x] Test suites (pytest + Vitest) with GitHub Actions CI
 
 ## Kyle's goals
 1. **Deploy to Railway** — ✅ live
