@@ -175,7 +175,16 @@ function scrapeAshby() {
 
 function scrapeSimplify() {
   const role = document.querySelector("h1")?.innerText?.trim();
-  const company = document.querySelector("h2")?.innerText?.trim();
+
+  // The first h2 is not always the company: job pages with a category subtitle
+  // render it as an h2 above the company one (e.g. "Backend" before "Otter.ai").
+  // The document title is always "Role @ Company | Simplify Jobs", so prefer the
+  // h2 that matches it, then the title itself, then the first h2.
+  const h2s = [...document.querySelectorAll("h2")]
+    .map((h) => h.innerText?.trim())
+    .filter(Boolean);
+  const titleCompany = document.title.match(/@\s*([^|]+?)\s*\|/)?.[1]?.trim() || "";
+  let company = h2s.find((t) => t === titleCompany) || titleCompany || h2s[0] || "";
 
   let description = "";
   let location = "";
@@ -190,6 +199,7 @@ function scrapeSimplify() {
     const nextData = JSON.parse(raw || "{}");
     const posting = nextData?.props?.pageProps?.jobPosting;
     if (posting && urlJobId && posting.id === urlJobId) {
+      company = posting.job?.company?.name || company;
       const tmp = document.createElement("div");
       tmp.innerHTML = posting.description || "";
       description = tmp.innerText?.trim();
