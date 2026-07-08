@@ -180,13 +180,16 @@ function scrapeSimplify() {
   let description = "";
   let location = "";
 
-  // __NEXT_DATA__ only has jobPosting on the initial server render of a job page.
-  // Client-side navigation from the search list leaves it stale, so fall back to DOM.
+  // __NEXT_DATA__ holds the jobPosting from the initial server render only.
+  // Navigating between jobs client-side (search list, matches carousel) leaves
+  // it pointing at the previously rendered job, so only trust it when its id
+  // matches the job UUID in the current URL.
+  const urlJobId = window.location.pathname.match(/\/p\/([0-9a-f-]{36})/i)?.[1];
   try {
     const raw = document.getElementById("__NEXT_DATA__")?.textContent;
     const nextData = JSON.parse(raw || "{}");
     const posting = nextData?.props?.pageProps?.jobPosting;
-    if (posting) {
+    if (posting && urlJobId && posting.id === urlJobId) {
       const tmp = document.createElement("div");
       tmp.innerHTML = posting.description || "";
       description = tmp.innerText?.trim();
@@ -197,11 +200,31 @@ function scrapeSimplify() {
 
   if (!description) {
     description =
+      // Full job posting tab content (present in the DOM even while hidden)
+      document.querySelector(".description")?.innerText?.trim() ||
       document.querySelector("[data-testid='job-description']")?.innerText?.trim() ||
       document.querySelector("[class*='JobDescription']")?.innerText?.trim() ||
       document.querySelector("[class*='job-description']")?.innerText?.trim() ||
       document.querySelector("article")?.innerText?.trim() ||
       "";
+  }
+
+  if (!location) {
+    // The left panel renders the location as a bold <p> next to a map-pin icon,
+    // e.g. "San Francisco, CA, USA" — take the first paragraph that looks like
+    // "City, ST" (or "Remote") and strip the country suffix.
+    for (const p of document.querySelectorAll("p")) {
+      const text = (p.innerText || "").trim();
+      if (/^Remote\b/i.test(text)) {
+        location = "Remote";
+        break;
+      }
+      const match = text.match(/^([A-Za-z][A-Za-z .'()-]*,\s*[A-Z]{2})(?![A-Za-z])/);
+      if (match) {
+        location = match[1];
+        break;
+      }
+    }
   }
 
   return { role, company, location, description };
