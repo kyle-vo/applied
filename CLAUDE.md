@@ -116,10 +116,10 @@ cd applied/frontend && npm install && npm run dev
 
 ## Testing
 ```bash
-# Backend — pytest (44 tests, in-memory SQLite, Claude mocked, real X-API-Key auth path)
+# Backend — pytest (51 tests, in-memory SQLite, Claude mocked, real X-API-Key auth path)
 cd backend && .venv/Scripts/python -m pytest
 
-# Frontend — Vitest + React Testing Library (13 tests)
+# Frontend — Vitest + React Testing Library (17 tests)
 cd frontend && npm test
 ```
 - Backend tests live in `backend/tests/` — auth, applications CRUD + summary stats, analyze (dedup/force/502), API keys, resumes, user isolation

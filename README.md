@@ -1,35 +1,87 @@
 # Applied — Job Application Tracker
 
-A full-stack job application tracker with AI-powered resume analysis, a kanban pipeline, and a Chrome extension that scrapes job postings directly from job boards.
+![CI](https://github.com/kyle-vo/applied/actions/workflows/ci.yml/badge.svg)
 
-**Live:** https://frontend-production-ab8c.up.railway.app
+A full-stack job application tracker with AI-powered resume analysis, a kanban pipeline, and a Chrome extension that captures job postings from 8 job boards in one click.
+
+### ▶ [**Try the live demo — no sign-up**](https://frontend-production-ab8c.up.railway.app)
+
+Click **"Try the demo"** on the sign-in page. You get an isolated account pre-seeded with a realistic pipeline — every feature works, and the session cleans itself up after 24 hours.
+
+![Dashboard](docs/screenshots/dashboard.png)
 
 ---
 
 ## Features
 
 - **Kanban pipeline** — drag-and-drop cards across Applied → Screening → Interview → Offer
-- **AI match scoring** — paste a job description and get a match score, strengths, gaps, and keywords against your resume via Claude
-- **AI resume tailoring** — get a tailored summary, bullet point rewrites, and keywords to add for each application
-- **Chrome extension** — one-click job capture from LinkedIn, Indeed, Greenhouse, Lever, Workday, Ashby, Simplify, and Handshake
-- **Resume management** — upload multiple resumes (PDF or plain text); AI uses your latest
-- **Analytics** — pipeline funnel, response rate, avg match score, and application activity over time
-- **Follow-up tracking** — set follow-up dates per application
+- **AI match scoring** — Claude scores your resume against each job description: score, strengths, gaps, keywords
+- **AI resume tailoring** — tailored summary, copy-pasteable bullet rewrites, and keywords to add per application
+- **Chrome extension** — one-click capture from LinkedIn, Indeed, Greenhouse, Lever, Workday, Ashby, Simplify, and Handshake
+- **Analytics** — pipeline funnel, response rate, score distribution, application activity over time
+- **Resume management** — PDF (stored in S3, text extracted) or plain text; multiple resumes
+- **Demo mode** — one click creates an isolated, seeded 24-hour account; demo AI calls return canned results so they can never spend API credits
+- **Follow-up tracking** — per-application follow-up dates
+
+| AI Analysis | Analytics |
+|---|---|
+| ![AI Analysis](docs/screenshots/analysis.png) | ![Analytics](docs/screenshots/analytics.png) |
 
 ---
+
+## Architecture
+
+```mermaid
+flowchart LR
+    subgraph Clients
+        W[React SPA<br/>Vite + Tailwind]
+        X[Chrome Extension<br/>Manifest V3]
+    end
+    subgraph Backend["Flask API"]
+        A[Auth middleware<br/>Clerk JWT + hashed API keys]
+        R[REST routes]
+        AI[AI service]
+    end
+    W -- "Bearer JWT (Clerk)" --> A
+    X -- "X-API-Key" --> A
+    A --> R
+    R --> P[(PostgreSQL)]
+    R --> S3[(AWS S3<br/>resume PDFs)]
+    AI --> C[Claude API]
+    R --> AI
+```
+
+- **Two auth paths:** the web app sends short-lived Clerk JWTs (verified against Clerk's JWKS); the extension uses long-lived API keys, stored as SHA-256 hashes and revocable in Settings.
+- **AI cost control:** analysis results are keyed by a SHA-256 content hash of (resume + job description) — unchanged content never triggers a duplicate Claude call. `?force=true` re-runs. Demo accounts always get canned results.
+- **User isolation:** every query is scoped to the authenticated `user_id`; covered by tests.
 
 ## Stack
 
 | Layer | Tech |
 |---|---|
-| Frontend | React 18 + Vite + Tailwind CSS |
-| Auth | Clerk (JWT) |
-| Drag and drop | @hello-pangea/dnd |
-| Backend | Flask + SQLAlchemy |
-| Database | PostgreSQL |
-| Cache | Redis |
+| Frontend | React 18, Vite, Tailwind CSS, TypeScript |
+| Auth | Clerk (JWT) + hashed long-lived API keys |
+| Backend | Flask, SQLAlchemy, Gunicorn |
+| Database | PostgreSQL (SQLite in tests) |
+| Storage | AWS S3 (resume PDFs, presigned URLs) |
 | AI | Anthropic API (claude-sonnet-4-6) |
-| Deploy | Railway |
+| Testing | pytest (51 tests) · Vitest + React Testing Library (17 tests) |
+| CI/CD | GitHub Actions — both suites + build on every push/PR |
+| Deploy | Railway (live) · Terraform for GCP Cloud Run/Cloud SQL ([terraform/](terraform/)) |
+
+---
+
+## Testing
+
+```bash
+# Backend — in-memory SQLite, Claude mocked, real API-key auth path
+cd backend && python -m pytest
+
+# Frontend
+cd frontend && npm test
+```
+
+Coverage includes auth (invalid/missing/revoked credentials), CRUD + summary stats, user isolation, the analyze flow (content-hash dedup, force re-run, AI failure → 502), API key lifecycle, and demo-mode guarantees (isolation per session, expired-account cleanup, and a test asserting demo analyze/tailor **never** call Claude).
 
 ---
 
@@ -38,41 +90,22 @@ A full-stack job application tracker with AI-powered resume analysis, a kanban p
 ```
 applied/
 ├── docker-compose.yml
+├── .github/workflows/ci.yml           # pytest + vitest + build on every push
+├── terraform/                          # IaC: GCP Cloud Run + Cloud SQL + Secret Manager
 ├── backend/
-│   ├── wsgi.py
-│   ├── requirements.txt
-│   └── app/
-│       ├── __init__.py
-│       ├── middleware/auth.py          # Clerk JWT + API key auth
-│       ├── models/
-│       │   ├── application.py
-│       │   ├── api_key.py
-│       │   └── resume.py
-│       ├── routes/
-│       │   ├── applications.py         # CRUD + /analyze + /tailor
-│       │   ├── keys.py
-│       │   ├── resumes.py
-│       │   └── settings.py
-│       └── services/
-│           └── ai.py                   # analyze_match(), tailor_resume()
+│   ├── app/
+│   │   ├── middleware/auth.py          # Clerk JWT + X-API-Key auth
+│   │   ├── models/                     # Application, Resume, ApiKey
+│   │   ├── routes/                     # applications (+ analyze/tailor), resumes, keys, demo
+│   │   └── services/
+│   │       ├── ai.py                   # analyze_match(), tailor_resume() — Claude
+│   │       └── demo.py                 # seeded demo data + canned AI results
+│   └── tests/                          # 51 pytest tests
 ├── frontend/
-│   └── src/
-│       ├── App.jsx
-│       ├── api.js                      # useApi hook (auto-attaches auth)
-│       ├── useApplications.js          # Central data hook
-│       ├── Dashboard.jsx
-│       ├── Applications.jsx
-│       ├── Analysis.jsx
-│       ├── Analytics.jsx
-│       ├── KanbanBoard.jsx
-│       ├── JobModal.jsx
-│       ├── Settings.jsx
-│       └── Toast.jsx
+│   └── src/                            # React SPA + Vitest tests
 └── extension/
-    ├── manifest.json
-    ├── popup.html / popup.js
-    ├── settings.html / settings.js
-    └── content.js                      # Scrapers for 8 job boards
+    ├── content.js                      # scrapers for 8 job boards
+    └── popup.js                        # captures the active tab's job into the tracker
 ```
 
 ---
@@ -80,8 +113,6 @@ applied/
 ## Running Locally
 
 **Prerequisites:** Docker, Node.js 18+, a Clerk account, an Anthropic API key
-
-### 1. Clone and configure
 
 ```bash
 git clone https://github.com/kyle-vo/applied.git
@@ -94,7 +125,6 @@ Create `backend/.env`:
 FLASK_ENV=development
 SECRET_KEY=your-secret-key
 DATABASE_URL=postgresql://trackr_user:trackr_pass@localhost:5432/trackr
-REDIS_URL=redis://localhost:6379/0
 CLERK_SECRET_KEY=sk_test_...
 CLERK_PUBLISHABLE_KEY=pk_test_...
 ANTHROPIC_API_KEY=sk-ant-...
@@ -107,101 +137,44 @@ Create `frontend/.env`:
 VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
 ```
 
-### 2. Start the backend
+Then:
 
 ```bash
+# Backend (Postgres via Docker, Flask on :5000)
 docker-compose up -d
-cd backend
-pip install -r requirements.txt
-flask db upgrade
-flask run
+cd backend && pip install -r requirements.txt && flask db upgrade && flask run
+
+# Frontend (:3000, proxies /api to Flask)
+cd frontend && npm install && npm run dev
 ```
 
-### 3. Start the frontend
+### Chrome extension
 
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-App runs at `http://localhost:3000`. The Vite dev server proxies `/api` to Flask.
-
-### 4. Load the Chrome extension
-
-1. Go to `chrome://extensions`
-2. Enable **Developer mode**
-3. Click **Load unpacked** → select the `extension/` folder
-4. Open Settings in the app, generate an API key, paste it into the extension settings
-
----
-
-## Chrome Extension
-
-Supports one-click job capture from:
-
-- LinkedIn (job pages + search results)
-- Indeed
-- Greenhouse
-- Lever
-- Workday
-- Ashby
-- Simplify
-- Handshake
-
-The extension uses a long-lived API key (generated in Settings) instead of Clerk JWT, so it stays authenticated without needing to log in.
-
-> **Note:** On LinkedIn search results pages, only the job title, company, and location are captured. Visit the individual job page (`/jobs/view/ID`) to also capture the job description.
-
----
-
-## AI Features
-
-### Match Scoring (`POST /api/applications/:id/analyze`)
-
-Compares your resume against the job description and returns:
-- **Score** (0–100) with rubric: 90–100 exceptional, 75–89 strong, 60–74 moderate, 40–59 weak, 0–39 poor
-- **Strengths** — where your resume aligns
-- **Gaps** — missing skills or experience
-- **Keywords** — key terms from the JD, color-coded by match status
-
-Results are cached in Redis for 1 hour. Use **Re-analyze** to bypass the cache.
-
-### Resume Tailoring (`POST /api/applications/:id/tailor`)
-
-Generates:
-- A tailored professional summary for the specific role
-- Suggested rewrites for existing bullet points
-- Keywords to weave into your resume
-
-Results are persisted to the database and survive page refresh. Use **Re-tailor** to regenerate.
+1. `chrome://extensions` → enable **Developer mode** → **Load unpacked** → select `extension/`
+2. In the app: Settings → generate an API key → paste it into the extension's settings
 
 ---
 
 ## API Reference
 
-All endpoints require `Authorization: Bearer <clerk_token>` or `X-API-Key: <key>`.
+All endpoints require `Authorization: Bearer <clerk_token>` or `X-API-Key: <key>` unless noted.
 
 | Method | Path | Description |
 |---|---|---|
 | GET | /health | Health check (no auth) |
+| POST | /api/demo/start | Create a seeded 24h demo account, returns API key (no auth) |
 | GET | /api/applications | List all + summary stats |
-| POST | /api/applications | Create application |
-| GET | /api/applications/:id | Get single |
-| PATCH | /api/applications/:id | Update fields |
-| DELETE | /api/applications/:id | Delete |
-| POST | /api/applications/:id/analyze | Run AI match scoring |
-| POST | /api/applications/:id/tailor | Run AI resume tailoring |
-| GET | /api/keys | List API keys |
-| POST | /api/keys | Generate new API key |
-| DELETE | /api/keys/:id | Revoke API key |
-| GET | /api/resumes | List resumes |
-| POST | /api/resumes | Upload resume |
+| POST | /api/applications | Create (409 + `?force=true` duplicate handling) |
+| GET/PATCH/DELETE | /api/applications/:id | Single application |
+| POST | /api/applications/:id/analyze | AI match scoring (content-hash dedup, `?force=true`) |
+| POST | /api/applications/:id/tailor | AI resume tailoring |
+| GET/POST | /api/keys · DELETE /api/keys/:id | API key lifecycle (raw key shown once) |
+| GET/POST | /api/resumes · PATCH/DELETE /api/resumes/:id | Resume management |
 
 ---
 
 ## Deployment
 
-Deployed on Railway with four services: frontend, backend, PostgreSQL, Redis.
+Live on **Railway** (frontend, backend, PostgreSQL). Migrations: `flask db upgrade` in the backend console after deploying one.
 
-After deploying a migration, run `flask db upgrade` in the Railway backend console.
+An alternative **Terraform** deployment to Google Cloud (Cloud Run + Cloud SQL + Secret Manager, least-privilege service account) lives in [terraform/](terraform/README.md).
