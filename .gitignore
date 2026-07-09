@@ -1,4 +1,4 @@
-# Environment
+﻿# Environment
 .env
 *.env
 
@@ -33,3 +33,9 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+
+# Terraform â€” state contains secrets and provider binaries are huge
+.terraform/
+*.tfstate
+*.tfstate.*
+terraform.tfvars

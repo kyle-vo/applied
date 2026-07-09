@@ -1,0 +1,14 @@
+# Copy this file to terraform.tfvars and fill in your real values.
+# terraform.tfvars is gitignored — it contains secrets and is yours alone.
+
+project_id = "your-gcp-project-id"
+region     = "us-west2"
+
+# Set after the first image push (terraform output image_repo tells you the repo path):
+image = "us-west2-docker.pkg.dev/your-gcp-project-id/applied/backend:latest"
+
+# Same values as backend/.env
+flask_secret_key      = "change-me"
+clerk_secret_key      = "sk_test_..."
+clerk_publishable_key = "pk_test_..."
+anthropic_api_key     = "sk-ant-..."
