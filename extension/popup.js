@@ -1,4 +1,4 @@
-const $ = (id) => document.getElementById(id);
+﻿const $ = (id) => document.getElementById(id);
 
 function showMsg(text, type) {
   const el = $("msg");
@@ -8,7 +8,7 @@ function showMsg(text, type) {
   if (type === "success") setTimeout(() => (el.style.display = "none"), 3000);
 }
 
-const API_URL = "https://backend-production-e4a61.up.railway.app/api";
+const API_URL = "https://applied-backend-pw8s.onrender.com/api";
 
 async function getApiKey() {
   return new Promise((resolve) =>
@@ -58,7 +58,7 @@ $("submitBtn").addEventListener("click", async () => {
   const apiKey = await getApiKey();
   const btn = $("submitBtn");
   btn.disabled = true;
-  btn.textContent = "Adding…";
+  btn.textContent = "Addingâ€¦";
 
   // Get current tab URL
   chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
@@ -83,12 +83,12 @@ $("submitBtn").addEventListener("click", async () => {
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        if (res.status === 401) throw new Error("Invalid API key — go to Settings and paste a new key from the Applied app.");
+        if (res.status === 401) throw new Error("Invalid API key â€” go to Settings and paste a new key from the Applied app.");
         throw new Error(err.error || `Error ${res.status}`);
       }
 
       showMsg("Added to Applied!", "success");
-      btn.textContent = "Added ✓";
+      btn.textContent = "Added âœ“";
       setTimeout(() => {
         btn.textContent = "Add to Applied";
         btn.disabled = false;

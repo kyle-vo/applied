@@ -1,6 +1,6 @@
-const $ = (id) => document.getElementById(id);
+﻿const $ = (id) => document.getElementById(id);
 
-const API_URL = "https://backend-production-e4a61.up.railway.app/api";
+const API_URL = "https://applied-backend-pw8s.onrender.com/api";
 
 // Load saved API key
 chrome.storage.sync.get(["apiKey"], ({ apiKey }) => {
