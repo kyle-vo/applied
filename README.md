@@ -4,7 +4,7 @@
 
 A full-stack job application tracker with AI-powered resume analysis, a kanban pipeline, and a Chrome extension that captures job postings from 8 job boards in one click.
 
-### ▶ [**Try the live demo — no sign-up**](https://frontend-production-ab8c.up.railway.app)
+### ▶ [**Try the live demo — no sign-up**](https://applied-six.vercel.app)
 
 Click **"Try the demo"** on the sign-in page. You get an isolated account pre-seeded with a realistic pipeline — every feature works, and the session cleans itself up after 24 hours.
 
@@ -67,7 +67,7 @@ flowchart LR
 | AI | Anthropic API (claude-sonnet-4-6) |
 | Testing | pytest (51 tests) · Vitest + React Testing Library (17 tests) |
 | CI/CD | GitHub Actions — both suites + build on every push/PR |
-| Deploy | Railway (live) · Terraform for GCP Cloud Run/Cloud SQL ([terraform/](terraform/)) |
+| Deploy | Vercel (frontend) + Render (backend) + Neon (Postgres) · Terraform for GCP ([terraform/](terraform/)) |
 
 ---
 
@@ -175,6 +175,6 @@ All endpoints require `Authorization: Bearer <clerk_token>` or `X-API-Key: <key>
 
 ## Deployment
 
-Live on **Railway** (frontend, backend, PostgreSQL). Migrations: `flask db upgrade` in the backend console after deploying one.
+Live on **Vercel** (frontend, [vercel.json](frontend/vercel.json)) + **Render** (backend, [render.yaml](render.yaml) blueprint — migrations run on boot) + **Neon** (serverless Postgres). Total hosting cost: $0/month; the backend scales to zero on idle (first request after ~15 min takes up to a minute).
 
 An alternative **Terraform** deployment to Google Cloud (Cloud Run + Cloud SQL + Secret Manager, least-privilege service account) lives in [terraform/](terraform/README.md).

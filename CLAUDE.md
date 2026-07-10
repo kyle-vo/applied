@@ -5,10 +5,10 @@ A full-stack job application tracker built by Kyle Vo. Tracks job applications t
 
 ## Stack
 - **Frontend:** React 18 + Vite + Tailwind CSS + Clerk (auth) + @hello-pangea/dnd (drag and drop)
-- **Backend:** Flask + SQLAlchemy + PostgreSQL + Redis
+- **Backend:** Flask + SQLAlchemy + PostgreSQL
 - **Auth:** Clerk (JWT verified on every backend request via `app/middleware/auth.py`) + long-lived API keys for the browser extension (`X-API-Key` header)
 - **AI:** Anthropic API — `claude-sonnet-4-6` — live in `backend/app/services/ai.py`
-- **Deploy:** Railway — live at https://frontend-production-ab8c.up.railway.app (backend: https://backend-production-e4a61.up.railway.app)
+- **Deploy:** Vercel (frontend) + Render free tier (backend, `render.yaml`) + Neon (Postgres) — live at https://applied-six.vercel.app (backend: https://applied-backend-pw8s.onrender.com). Migrated off Railway Jul 2026 (`docs/hosting-migration.md`); Render cold-starts ~1 min after 15 min idle.
 
 ## Project structure
 ```
