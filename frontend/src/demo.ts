@@ -19,3 +19,11 @@ export async function startDemo(): Promise<void> {
 export function exitDemo(): void {
   localStorage.removeItem(STORAGE_KEY);
 }
+
+// Render's free tier spins the backend down after 15 idle minutes and takes
+// up to a minute to wake. Fire-and-forget a /health ping as soon as the app
+// loads so the server is already waking while the visitor reads the page.
+export function warmBackend(): void {
+  const healthUrl = BASE_URL.replace(/\/api$/, "") + "/health";
+  fetch(healthUrl).catch(() => {});
+}

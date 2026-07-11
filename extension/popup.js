@@ -58,7 +58,15 @@ $("submitBtn").addEventListener("click", async () => {
   const apiKey = await getApiKey();
   const btn = $("submitBtn");
   btn.disabled = true;
-  btn.textContent = "Addingâ€¦";
+  btn.textContent = "Adding...";
+
+  // Render's free tier spins down after 15 idle minutes; the first request
+  // then takes up to a minute. If we're still waiting after a few seconds,
+  // tell the user what's happening instead of looking frozen.
+  const coldStartNotice = setTimeout(() => {
+    btn.textContent = "Waking up server (~1 min)...";
+    showMsg("Free hosting is waking up - this first request can take up to a minute.", "error");
+  }, 4000);
 
   // Get current tab URL
   chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
@@ -81,19 +89,21 @@ $("submitBtn").addEventListener("click", async () => {
         }),
       });
 
+      clearTimeout(coldStartNotice);
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        if (res.status === 401) throw new Error("Invalid API key â€” go to Settings and paste a new key from the Applied app.");
+        if (res.status === 401) throw new Error("Invalid API key - go to Settings and paste a new key from the Applied app.");
         throw new Error(err.error || `Error ${res.status}`);
       }
 
       showMsg("Added to Applied!", "success");
-      btn.textContent = "Added âœ“";
+      btn.textContent = "Added ✓";
       setTimeout(() => {
         btn.textContent = "Add to Applied";
         btn.disabled = false;
       }, 2000);
     } catch (err) {
+      clearTimeout(coldStartNotice);
       showMsg(err.message, "error");
       btn.textContent = "Add to Applied";
       btn.disabled = false;
